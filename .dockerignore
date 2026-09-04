@@ -1,0 +1,15 @@
+node_modules
+data
+tmp
+outputs
+dist
+.git
+.env
+.env.*
+*.pdf
+*.xls
+*.xlsx
+templates/source.xls
+!templates/toyota.xlsx
+tests
+README.md

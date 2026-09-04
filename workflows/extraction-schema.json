@@ -1,0 +1,64 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "source_order_id",
+    "destination",
+    "delivery_date",
+    "route",
+    "page_number",
+    "page_count",
+    "items"
+  ],
+  "properties": {
+    "source_order_id": {
+      "type": "string"
+    },
+    "destination": {
+      "type": "string"
+    },
+    "delivery_date": {
+      "type": "string"
+    },
+    "route": {
+      "type": "string"
+    },
+    "page_number": {
+      "type": "integer"
+    },
+    "page_count": {
+      "type": "integer"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "part_number",
+          "item_code",
+          "pack_size",
+          "kanban_count",
+          "total_quantity"
+        ],
+        "properties": {
+          "part_number": {
+            "type": "string"
+          },
+          "item_code": {
+            "type": "string"
+          },
+          "pack_size": {
+            "type": "integer"
+          },
+          "kanban_count": {
+            "type": "integer"
+          },
+          "total_quantity": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  }
+}

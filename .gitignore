@@ -1,0 +1,14 @@
+node_modules/
+dist/
+data/
+.env
+.env.*
+!.env.example
+tmp/
+outputs/
+*.log
+# Supplied business reference originals are local inputs, not application source.
+/*.pdf
+/*.xls
+/*.xlsx
+templates/source.xls

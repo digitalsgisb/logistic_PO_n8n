@@ -1,0 +1,42 @@
+{
+  "name": "toyota-po-converter",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.12.0"
+  },
+  "scripts": {
+    "dev": "tsx watch server/index.ts",
+    "dev:web": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "start": "tsx server/index.ts",
+    "test": "tsx --test tests/*.test.ts",
+    "prepare:template": "tsx scripts/prepare-template.ts",
+    "workflow": "tsx scripts/build-workflow.ts",
+    "sample": "tsx scripts/sample.ts",
+    "setup": "tsx scripts/setup.ts"
+  },
+  "dependencies": {
+    "@fastify/cookie": "11.1.2",
+    "@fastify/multipart": "10.1.1",
+    "@fastify/rate-limit": "11.2.0",
+    "archiver": "8.0.0",
+    "exceljs": "4.4.0",
+    "fastify": "5.12.1",
+    "pdfjs-dist": "6.3.289",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "tsx": "4.23.13"
+  },
+  "devDependencies": {
+    "@types/archiver": "8.0.0",
+    "@types/node": "26.4.1",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "@vitejs/plugin-react": "6.1.1",
+    "prettier": "3.8.1",
+    "typescript": "7.0.2",
+    "vite": "8.2.2"
+  }
+}

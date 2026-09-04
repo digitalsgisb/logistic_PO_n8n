@@ -1,0 +1,38 @@
+name: toyota-po
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+    init: true
+    env_file: .env
+    environment:
+      DATA_DIR: /data
+      TEMPLATE_PATH: /app/templates/toyota.xlsx
+      TZ: Asia/Kuala_Lumpur
+    volumes:
+      - toyota-data:/data
+    networks:
+      default:
+      automation:
+        aliases: [toyota-api]
+    extra_hosts:
+      - host.docker.internal:host-gateway
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    restart: unless-stopped
+    ports:
+      - '${BIND_IP:-127.0.0.1}:${WEB_PORT:-8088}:80'
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [default]
+volumes:
+  toyota-data:
+networks:
+  automation:
+    external: true
+    name: ${N8N_NETWORK:-n8n_default}
