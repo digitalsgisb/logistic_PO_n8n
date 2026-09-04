@@ -130,6 +130,8 @@ Outputs go to `outputs/combined-live-sample/`. Without `--live`, the sample scri
 - `WS02-NN` and `WM02-NN` are route identifiers, separate from the trip. For example, the sample Bukit Raja order has route `WM02-03` but sequence `2026090302`, so its quantities and Remarks belong to Trip 2. HU83 retains route `WS02-01` even when `PA1-10` is also printed.
 - `QTY` uses total pieces. Orders sharing a delivery date, trip, and item code are added into that quantity cell; conflicting part numbers require review.
 - Suffixed PO numbers appear once per order in column AE (Remarks), within that trip's three rows, in bold 20-point text. Wrapped Remarks rows expand when needed. KB NO, DO.NO, ETA, and outstanding cells remain blank.
+- Matching star labels link quantities to their PO in Remarks: `*` for a trip with one PO, or `*1`, `*2`, etc. for multiple POs. Labels restart for each trip. Shared quantities list all contributing labels below the total; quantity cells remain numeric for calculations.
+- Every generated daily sheet uses A4 landscape with the template print area fitted to one page wide and one page tall. Pull and rebuild the API (`docker compose up -d --build`), then start a new batch to apply these settings and star labels to downloads.
 - The header date comes from the source. Each date gets a daily template sheet in the same workbook. A single-date batch retains the `ASSB2016` sheet name.
 - Repeated order pages are deduplicated; missing pages and conflicting versions require review. Source orders remain separate in extraction records. Within one order, repeated matching items are summed only when part and pack details agree.
 - Matching source identifiers and numeric values is mandatory. Unknown destinations/codes/routes, ambiguous dates, missing items, and quantity discrepancies do not produce a ready workbook.
@@ -144,7 +146,7 @@ npm run prepare:template -- templates/source.xls
 
 This converts with LibreOffice, retains `ASSB2016`, clears example values, and corrects the repeated Trip 4 label to Trip 5. Visually review the output before replacing the deployed template. `SOFFICE_PATH` can select a non-default LibreOffice executable.
 
-The initial bundled template was prepared from the source BIFF cells, styles, dimensions, and merges using `scripts/extract-xls.py` because LibreOffice was unavailable on the development computer. That fallback sets an A3 landscape print area of A4:AE42; it is not represented as a LibreOffice-verified conversion. The normal regeneration route above uses LibreOffice and retains its converted print settings.
+The initial bundled template was prepared from the source BIFF cells, styles, dimensions, and merges using `scripts/extract-xls.py` because LibreOffice was unavailable on the development computer. That fallback template stores A3 landscape with print area A4:AE42; it is not represented as a LibreOffice-verified conversion. The normal regeneration route above uses LibreOffice and retains its converted print settings. The workbook generator overrides the paper settings to A4 landscape, fitted to one page per daily sheet, for every download.
 
 ## Pilot limits and troubleshooting
 

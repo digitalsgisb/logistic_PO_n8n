@@ -4,6 +4,13 @@ Verified on 4 September 2026 with Node 24.12.0 on Windows.
 
 ## Completed checks
 
+### A4 printing and matching star labels
+
+- All 16 tests, TypeScript checking, and the production build passed. Saved workbooks were reopened to verify A4 landscape, one-page fitting, preserved print areas, numeric quantities, and matching PO labels across single-date and multiple-date outputs.
+- Quantity styles are cloned so different PO labels cannot overwrite one another through shared template styles. Multiline number formats preserve XML newline entities when saved, keeping shared-total labels below the number.
+- Rendered sample quantities and bold Remarks were reviewed, including shared totals from two and seven POs. Labels and Remarks fit without clipping. This verifies worksheet layout and saved print settings; no physical printer or Excel print preview was available locally.
+- Existing downloads need a new batch after pulling and rebuilding the API. No extraction schema or n8n workflow changes are required.
+
 ### Delivery sequence correction and larger Remarks
 
 - All 16 tests and the TypeScript/production build passed. Trip numbers now come from the final two digits of the printed `YYYYMMDDNN` sequence, independently of route codes. Tests cover trips 1, 2, and 10, route/sequence disagreement, missing or invalid sequences, conflicting copies, and different sequences across an order's pages.
