@@ -49,6 +49,19 @@ export function isoDate(value: string) {
     throw new Error('Invalid delivery date.');
   return value;
 }
+function deliverySequence(text: string, date: string) {
+  // The printed YYYYMMDDNN sequence is authoritative; route suffixes are unrelated.
+  const sequences = [...new Set(text.match(/\b20\d{8}\b/g) ?? [])];
+  if (sequences.length !== 1)
+    throw new Error('Missing or conflicting delivery sequence; expected YYYYMMDDNN on the source page.');
+  const sequence = sequences[0];
+  if (sequence.slice(0, 8) !== date.replaceAll('-', ''))
+    throw new Error('Delivery sequence date disagrees with the delivery date.');
+  const trip = Number(sequence.slice(-2));
+  if (trip < 1 || trip > 10)
+    throw new Error('Delivery sequence must end in a supported trip number, 01 to 10.');
+  return { sequence, trip };
+}
 export function validatePage(raw: unknown, page: Page): Order {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('AI returned no order object.');
   const x = raw as Extraction;
@@ -60,10 +73,11 @@ export function validatePage(raw: unknown, page: Page): Order {
   const place = destination(x.destination);
   if (destination(page.text) !== place) throw new Error('Destination disagrees with the source page.');
   const route = typeof x.route === 'string' ? x.route.toUpperCase() : '';
-  if (!/^(WS02|WM02)-(0[1-9]|10)$/.test(route) || !page.text.includes(route))
+  if (!/^(WS02|WM02)-\d{2}$/.test(route) || !page.text.includes(route))
     throw new Error('Missing, unknown, or ungrounded delivery route.');
-  const sourceRoutes = [...new Set(page.text.match(/(?:WS02|WM02)-\d{2}/g) ?? [])];
-  if (sourceRoutes.length !== 1) throw new Error('Conflicting delivery routes on the source page.');
+  const sourceRoutes = [...new Set(page.text.match(/\b(?:WS02|WM02)-\d{2}\b/g) ?? [])];
+  if (sourceRoutes.length !== 1 || sourceRoutes[0] !== route)
+    throw new Error('Conflicting delivery routes on the source page.');
   const date = isoDate(String(x.delivery_date));
   const [y, m, d] = date.split('-');
   const sourceDates = [...page.text.matchAll(/\b(\d{2})\/(\d{2})\/(\d{4}|\d{2})\b/g)].map(
@@ -71,6 +85,7 @@ export function validatePage(raw: unknown, page: Page): Order {
   );
   if (!sourceDates.includes(`${y}-${m}-${d}`) || new Set(sourceDates).size !== 1)
     throw new Error('Delivery date is missing or ambiguous in the source.');
+  const { sequence, trip } = deliverySequence(page.text, date);
   // Page markers must be isolated (dates are excluded).
   const marker = page.text
     .split('\n')
@@ -125,7 +140,8 @@ export function validatePage(raw: unknown, page: Page): Order {
     destination: place,
     route,
     kb_number: kbNumber(x.source_order_id, place),
-    trip: +route.slice(-2),
+    delivery_sequence: sequence,
+    trip,
     source_pages: [`${page.filename} / page ${page.number}`],
     source_page_ids: [page.id],
   };
@@ -158,6 +174,7 @@ export function assemble(pages: Page[]): { orders: Order[]; errors: Result[] } {
             v.destination !== first.destination ||
             v.delivery_date !== first.delivery_date ||
             v.route !== first.route ||
+            v.delivery_sequence !== first.delivery_sequence ||
             v.page_count !== first.page_count,
         )
       )

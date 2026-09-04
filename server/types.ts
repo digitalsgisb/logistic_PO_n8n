@@ -18,6 +18,7 @@ export interface Extraction {
 export interface Order extends Omit<Extraction, 'destination'> {
   destination: Destination;
   kb_number: string;
+  delivery_sequence: string;
   trip: number;
   source_pages: string[];
   source_page_ids: string[];

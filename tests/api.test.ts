@@ -143,7 +143,9 @@ test('authenticated upload → n8n callbacks → one combined download; duplicat
     await downloaded.xlsx.load(file.rawPayload as unknown as ExcelJS.Buffer);
     assert.equal(downloaded.worksheets.length, 1);
     assert.equal(downloaded.worksheets[0].getCell('V13').value, 1200);
-    assert.equal(downloaded.worksheets[0].getCell('AE19').value, 'SGIS13FA5002-BR');
+    assert.equal(downloaded.worksheets[0].getCell('AE17').value, 'SGIS13FA5002-BR');
+    assert.equal(downloaded.worksheets[0].getCell('H16').value, 30);
+    assert.equal(downloaded.worksheets[0].getCell('H19').value, null);
     const zip = await app.inject({ url: `/api/jobs/${id}/download-all`, headers });
     assert.equal(zip.statusCode, 200);
     assert.ok(zip.rawPayload.includes(Buffer.from('Toyota_2026-09-03_Combined.xlsx')));
@@ -233,8 +235,9 @@ test('partial results survive restart and retry rebuilds one workbook without du
     const combined = new ExcelJS.Workbook();
     await combined.xlsx.readFile(readyPath);
     assert.equal(combined.worksheets[0].getCell('V13').value, 1200);
-    assert.equal(combined.worksheets[0].getCell('H19').value, 30);
-    assert.equal(combined.worksheets[0].getCell('AE19').value, 'SGIS13FA5002-BR');
+    assert.equal(combined.worksheets[0].getCell('H16').value, 30);
+    assert.equal(combined.worksheets[0].getCell('AE16').value, 'SGIS13FA5002-BR');
+    assert.equal(combined.worksheets[0].getCell('H19').value, null);
     const interrupted = instance.store.get(id)!;
     interrupted.state = 'processing';
     instance.store.save(interrupted);

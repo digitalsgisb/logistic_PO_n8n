@@ -42,7 +42,12 @@ test('four sample orders produce one daily sheet with nine quantities and PO num
     assert.equal(s.getCell('AE13').value, 'SGIS12AA0747-SA');
     assert.equal(s.getCell('AE14').value, 'SGIS12DA3251-SA');
     assert.equal(s.getCell('AE16').value, 'SGIS12DA3252-SA');
-    assert.equal(s.getCell('AE19').value, 'SGIS13FA5002-BR');
+    assert.equal(s.getCell('AE17').value, 'SGIS13FA5002-BR');
+    assert.equal(s.getCell('H16').value, 30);
+    assert.equal(s.getCell('H19').value, null);
+    assert.equal(s.getCell('AE19').value, null);
+    assert.equal(s.getCell('AE17').font.size, 20);
+    assert.equal(s.getCell('AE17').font.bold, true);
     assert.equal(s.getCell('AE15').value, null);
     assert.equal(s.pageSetup.printArea, 'A4:AE42');
     assert.equal(s.pageSetup.orientation, 'landscape');
@@ -62,6 +67,7 @@ test('shared item and trip quantities add without overwriting; dates stay on sep
       source_order_id: 'SGIS12AA0749',
       kb_number: 'SGIS12AA0749-SA',
       delivery_date: '2026-09-04',
+      delivery_sequence: '2026090401',
     };
     const file = path.join(dir, 'combined.xlsx');
     await writeBatch([a, sameTrip, otherDate], 'templates/toyota.xlsx', file);
@@ -96,7 +102,7 @@ test('shared item and trip quantities add without overwriting; dates stay on sep
       [13, 14, 15].flatMap((r) => String(sheet.getCell(r, 31).value).split('\n')),
       crowded.map((o) => o.kb_number),
     );
-    assert.ok(sheet.getRow(13).height! >= 60);
+    assert.ok(sheet.getRow(13).height! >= 84);
     sameTrip.items[0].part_number = 'XXXXX-XXXXX-XX';
     await assert.rejects(
       writeBatch([a, sameTrip], 'templates/toyota.xlsx', file),
@@ -117,6 +123,51 @@ test('destination normalization and suffix derivation preserve the original ID',
   assert.equal(o.source_order_id, 'SGIS12AA0747');
   assert.equal(o.trip, 1);
   assert.equal(p.extraction?.source_order_id, 'SGIS12AA0747');
+});
+
+test('trip comes from the printed delivery sequence independently of the route suffix', () => {
+  for (const trip of [1, 2, 10]) {
+    const p = pageFor(orders[3]);
+    const sequence = `20260903${String(trip).padStart(2, '0')}`;
+    p.text = p.text.replace('2026090302', sequence);
+    const result = validatePage(p.extraction, p);
+    assert.equal(result.trip, trip);
+    assert.equal(result.delivery_sequence, sequence);
+    assert.equal(result.route, 'WM02-03');
+  }
+  const p = pageFor();
+  p.text = p.text.replace('WS02-01', 'WS02-12');
+  p.extraction!.route = 'WS02-12';
+  p.text += '\n2026090301'; // Duplicate text of the same sequence is harmless.
+  assert.equal(validatePage(p.extraction, p).trip, 1);
+});
+
+test('missing, conflicting, invalid, or wrong-date sequences require review instead of using the route', () => {
+  for (const replacement of [
+    '',
+    '2026090300',
+    '2026090311',
+    '2026090401',
+    '2026090301 2026090302',
+    '20260903010',
+  ]) {
+    const p = pageFor();
+    p.text = p.text.replace('2026090301', replacement);
+    assert.throws(() => validatePage(p.extraction, p), /[Dd]elivery sequence/);
+    assert.equal(assemble([p]).orders.length, 0);
+  }
+});
+
+test('different delivery sequences across pages of one order require review', () => {
+  const first = structuredClone(orders[0]);
+  first.page_count = 2;
+  const second = { ...structuredClone(first), page_number: 2 };
+  const p = pageFor(first, 'a');
+  const q = pageFor(second, 'b');
+  q.text = q.text.replace('2026090301', '2026090302');
+  const result = assemble([p, q]);
+  assert.equal(result.orders.length, 0);
+  assert.match(result.errors[0].error!, /Conflicting versions or delivery details/);
 });
 test('unknown/conflicting destinations cannot receive a guessed suffix', () => {
   for (const value of ['ASSB UNKNOWN', 'ASSB SHAH ALAM BKT RAJA']) assert.throws(() => destination(value));

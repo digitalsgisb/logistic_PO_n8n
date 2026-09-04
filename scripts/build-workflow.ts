@@ -40,7 +40,7 @@ Extract every printed item line. Do not infer missing fields. Use an empty strin
 source_order_id is the SGIS identifier near the barcode, for example SGIS12AA0747. Exclude the preceding 11 or 12. Do NOT append -SA or -BR: the application derives that suffix.
 destination is SHAH ALAM when ASSB SHAH ALAM is printed, or BUKIT RAJA when ASSB BKT RAJA / BUKIT RAJA is printed. Never infer destination from an order ID or part code.
 delivery_date is the scheduled delivery date in YYYY-MM-DD. Source dates are DD/MM/YYYY or DD/MM/YY.
-route is the WS02-NN or WM02-NN delivery route. In particular a page with PA1-10 and WS02-01 has route WS02-01, not PA1-10.
+route is the WS02-NN or WM02-NN delivery route. In particular a page with PA1-10 and WS02-01 has route WS02-01, not PA1-10. Preserve the route exactly; its suffix does not determine the trip. The application reads the printed YYYYMMDDNN delivery sequence directly from the source text and uses its final two digits for the trip (2026090302 means Trip 2, even with route WM02-03). Do not add a trip field to the schema output.
 page_number and page_count come from the printed order pagination, such as 1/1 or 2/3; they are not positions in the uploaded PDF.
 For each item extract the long part_number, short item_code, and final three numeric columns: pack_size, kanban_count, total_quantity. For example HU83 with 400 3 1200 means pack_size 400, kanban_count 3, total_quantity 1200. The printed TOTAL is a kanban count, not an additional item.
 Ignore duplicate text overlay copies and barcode representations. Preserve identifiers exactly. Read the whole page.`;

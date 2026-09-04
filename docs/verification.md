@@ -4,6 +4,13 @@ Verified on 4 September 2026 with Node 24.12.0 on Windows.
 
 ## Completed checks
 
+### Delivery sequence correction and larger Remarks
+
+- All 16 tests and the TypeScript/production build passed. Trip numbers now come from the final two digits of the printed `YYYYMMDDNN` sequence, independently of route codes. Tests cover trips 1, 2, and 10, route/sequence disagreement, missing or invalid sequences, conflicting copies, and different sequences across an order's pages.
+- The supplied PDF was rechecked: sample sequences are `2026090301`, `2026090301`, `2026090302`, and `2026090302`. Bukit Raja quantities now appear on Trip 2 (row 16), with its PO in that trip's Remarks. Trip 3 remains blank for this sample.
+- Regenerated one workbook from the original sample PDF text and fixture extraction values, then inspected its cells and rendered layout. All four POs and nine item quantities were preserved. Remarks increased from 14-point to bold 20-point text without clipping; row-height checks also cover seven POs in one trip.
+- The API derives the sequence directly from source text, so existing n8n extraction responses remain compatible. The bundled prompt explains the corrected rule. Completed downloads need a new batch to get the corrected workbook. This check did not rerun the live AI model.
+
 ### Company branding and interface update
 
 - Added moving glow and curved wave layers to the green sign-in panel. Browser checks compared animation frames, confirmed stationary heading text, working inputs and mobile layout, and verified that reduced-motion preferences disable both layers. The production build passed.
@@ -17,7 +24,7 @@ Verified on 4 September 2026 with Node 24.12.0 on Windows.
 ### Combined workbook update
 
 - Rechecked the staged update before publishing: all 13 tests, TypeScript checking, and the production Vite build passed. The local npm launcher was unavailable, so the same test/build entry points were run directly with Node.
-- Regenerated the combined sample from `TOYOTA PO.pdf` using fixture extraction values and inspected the rendered daily sheet and Remarks. All four POs and nine item lines are in one workbook. The photo is a layout reference; quantities and trip assignments follow the source POs (including Bukit Raja route `WM02-03`, which belongs to Trip 3).
+- Regenerated the combined sample from `TOYOTA PO.pdf` using fixture extraction values and inspected the rendered daily sheet and Remarks. All four POs and nine item lines are in one workbook. The route-based trip assumption in this earlier update was subsequently corrected as documented above.
 - Thirteen local tests pass, including one download containing all four sample orders and nine quantities, original trip assignments, suffixed PO numbers in Remarks, blank KB rows, duplicate uploads, and restart/retry without doubled quantities.
 - Shared item/trip totals, multiple delivery dates in one workbook, copied sheet merges and print settings, and more than three PO numbers in one trip are covered.
 - The combined layout was generated from the supplied PDF text with the known extraction fixtures and visually reviewed. This output change does not modify the extraction model or the existing n8n workflow.

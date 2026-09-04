@@ -85,6 +85,8 @@ Jobs, original uploads, extracted values, and outputs are stored in the `toyota-
 
 For the combined-output update, keep your working `.env`, Compose networking changes, and n8n workflow URLs. Only the application needs rebuilding. Completed jobs keep their existing downloads; choose **Start new batch** and upload the PDFs again to get the new combined layout. Retried partial jobs rebuild a single workbook from all valid orders.
 
+The trip-sequence correction and larger Remarks text require rebuilding the **API**, which generates the workbook; rebuilding only `web` will not apply them. Run `docker compose up -d --build` after pulling, then start a new batch and upload the PDFs again. The API reads the printed delivery sequence from the saved PDF text, so the existing n8n workflow and extraction schema remain compatible. The bundled prompt now clarifies the distinction between route and trip, but reimporting the workflow is not required for this fix.
+
 ## Local development
 
 Requires Node 24.12 or later. SQLite uses Node's built-in driver; its experimental warning on Node 24.12 is expected.
@@ -124,9 +126,10 @@ Outputs go to `outputs/combined-live-sample/`. Without `--live`, the sample scri
 
 - The template is `templates/toyota.xlsx`, containing only `ASSB2016`.
 - Item-code headers map deterministically to columns D–AD. Bukit Raja occupies D–U and Shah Alam V–AD.
-- Trip quantity rows begin at 13 and repeat every three rows. `WS02-NN` and `WM02-NN` support trips 1–10. HU83 uses `WS02-01` even when `PA1-10` is also printed.
+- Trip quantity rows begin at 13 and repeat every three rows. The trip comes from the last two digits of the printed `YYYYMMDDNN` delivery sequence: `2026090301` is Trip 1, `2026090302` is Trip 2. The first eight digits must match the delivery date, and trips 01–10 are supported. Missing, conflicting, or invalid sequences require review.
+- `WS02-NN` and `WM02-NN` are route identifiers, separate from the trip. For example, the sample Bukit Raja order has route `WM02-03` but sequence `2026090302`, so its quantities and Remarks belong to Trip 2. HU83 retains route `WS02-01` even when `PA1-10` is also printed.
 - `QTY` uses total pieces. Orders sharing a delivery date, trip, and item code are added into that quantity cell; conflicting part numbers require review.
-- Suffixed PO numbers appear once per order in column AE (Remarks), within that trip's three rows. Wrapped Remarks rows expand when needed. KB NO, DO.NO, ETA, and outstanding cells remain blank.
+- Suffixed PO numbers appear once per order in column AE (Remarks), within that trip's three rows, in bold 20-point text. Wrapped Remarks rows expand when needed. KB NO, DO.NO, ETA, and outstanding cells remain blank.
 - The header date comes from the source. Each date gets a daily template sheet in the same workbook. A single-date batch retains the `ASSB2016` sheet name.
 - Repeated order pages are deduplicated; missing pages and conflicting versions require review. Source orders remain separate in extraction records. Within one order, repeated matching items are summed only when part and pack details agree.
 - Matching source identifiers and numeric values is mandatory. Unknown destinations/codes/routes, ambiguous dates, missing items, and quantity discrepancies do not produce a ready workbook.

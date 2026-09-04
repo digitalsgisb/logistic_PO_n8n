@@ -2,11 +2,19 @@ import fixtures from './fixtures/orders.json' with { type: 'json' };
 import type { Extraction, Page } from '../server/types.ts';
 import { hash } from '../server/mapping.ts';
 export const orders: Extraction[] = fixtures;
+// Independently transcribed from the printed sequence on each supplied sample page.
+const sequences: Record<string, string> = {
+  SGIS12AA0747: '2026090301',
+  SGIS12DA3251: '2026090301',
+  SGIS12DA3252: '2026090302',
+  SGIS13FA5002: '2026090302',
+};
 export function textFor(x: Extraction) {
   return [
     '03/09/2026 11:15',
     'ASSB ' + x.destination,
     '11 ' + x.source_order_id,
+    `SGIS SUGIHARA GRAND SGIS-1 ${sequences[x.source_order_id] ?? x.delivery_date.replaceAll('-', '') + '01'}`,
     `${x.page_number}/${x.page_count}`,
     '10 PA1-10',
     x.route,

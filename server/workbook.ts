@@ -55,9 +55,15 @@ export async function writeBatch(orders: Order[], template: string, destination:
         const cell = sheet.getCell(row + i, 31);
         cell.value = count ? numbers.slice(offset, offset + count).join('\n') : null;
         if (count) {
-          cell.font = { ...cell.font, size: 14 };
-          cell.alignment = { ...cell.alignment, horizontal: 'left', vertical: 'middle', wrapText: true };
-          sheet.getRow(row + i).height = Math.max(sheet.getRow(row + i).height ?? 15, count * 18 + 6);
+          cell.font = { ...cell.font, size: 20, bold: true };
+          cell.alignment = {
+            ...cell.alignment,
+            horizontal: 'left',
+            vertical: 'middle',
+            wrapText: true,
+            shrinkToFit: false,
+          };
+          sheet.getRow(row + i).height = Math.max(sheet.getRow(row + i).height ?? 15, count * 26 + 6);
         }
         offset += count;
       }
