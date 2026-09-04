@@ -44,7 +44,7 @@ export async function writeBatch(orders: Order[], template: string, destination:
       const tripOrders = orders.filter((order) => order.delivery_date === date && order.trip === trip);
       const markedOrders = tripOrders.map((order, index) => ({
         order,
-        marker: tripOrders.length === 1 ? '' : '*'.repeat(index + 1),
+        marker: '*'.repeat(index),
       }));
       const quantities = new Map<string, { part: string; total: number; markers: string[] }>();
       for (const { order, marker } of markedOrders)
@@ -72,7 +72,7 @@ export async function writeBatch(orders: Order[], template: string, destination:
         if (markers.length === 1) {
           cell.numFmt = markers[0] ? `"${markers[0]} "0` : '0';
         } else {
-          const lines = markers;
+          const lines = markers.filter(Boolean);
           cell.numFmt = `0"\n${lines.join('\n')}"`;
           sheet.getRow(row).height = Math.max(sheet.getRow(row).height ?? 15, (lines.length + 1) * 24 + 6);
         }
