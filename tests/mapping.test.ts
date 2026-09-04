@@ -39,10 +39,10 @@ test('four sample orders produce one daily sheet with nine quantities and PO num
     assert.equal(s.getCell('H10').value, null);
     assert.equal(s.getCell('C13').value, null);
     assert.equal(s.getCell('V13').value, 1200);
-    assert.equal(s.getCell('AE13').value, 'SGIS12AA0747-SA');
-    assert.equal(s.getCell('AE14').value, '* SGIS12DA3251-SA');
+    assert.equal(s.getCell('AE13').value, '* SGIS12AA0747-SA');
+    assert.equal(s.getCell('AE14').value, 'SGIS12DA3251-SA');
     assert.equal(s.getCell('AE16').value, 'SGIS12DA3252-SA');
-    assert.equal(s.getCell('AE17').value, '* SGIS13FA5002-BR');
+    assert.equal(s.getCell('AE17').value, 'SGIS13FA5002-BR');
     assert.equal(s.getCell('H16').value, 30);
     assert.equal(s.getCell('H19').value, null);
     assert.equal(s.getCell('AE19').value, null);
@@ -55,9 +55,10 @@ test('four sample orders produce one daily sheet with nine quantities and PO num
     assert.equal(s.pageSetup.fitToPage, true);
     assert.equal(s.pageSetup.fitToWidth, 1);
     assert.equal(s.pageSetup.fitToHeight, 1);
-    assert.equal(s.getCell('V13').numFmt, '0');
-    assert.equal(s.getCell('W13').numFmt, '"* "0');
-    assert.equal(s.getCell('D16').numFmt, '"* "0');
+    assert.equal(s.getCell('V13').numFmt, '"* "0');
+    assert.equal(s.getCell('W13').numFmt, '0');
+    assert.equal(s.getCell('D16').numFmt, '0');
+    assert.equal(s.getCell('W16').numFmt, '0');
     assert.ok(s.model.merges.includes('D6:U6'));
   } finally {
     await fs.rm(dir, { recursive: true, force: true });
@@ -122,6 +123,40 @@ test('shared item and trip quantities add without overwriting; dates stay on sep
     await fs.rm(dir, { recursive: true, force: true });
   }
 });
+test('markers are destination-local and prioritize HOOK independently of upload order or quantity', async () => {
+  const sample = orders.map((o, i) => validatePage(pageFor(o, String(i)).extraction, pageFor(o, String(i))));
+  const hook = structuredClone(sample[0]);
+  hook.items[0].total_quantity = 600;
+  const third = { ...sample[2], trip: 1, delivery_sequence: '2026090301' };
+  const bukit = { ...sample[3], trip: 1, delivery_sequence: '2026090301' };
+  const input = [hook, sample[1], third, bukit];
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'toyota-destination-markers-'));
+  try {
+    for (const batch of [input, [...input].reverse(), [hook, bukit]]) {
+      const file = path.join(dir, 'markers.xlsx');
+      await writeBatch(batch, 'templates/toyota.xlsx', file);
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.readFile(file);
+      const sheet = wb.worksheets[0];
+      const remarks = [13, 14, 15].flatMap((r) => String(sheet.getCell(r, 31).value ?? '').split('\n'));
+      assert.ok(remarks.includes('SGIS13FA5002-BR'));
+      assert.equal(sheet.getCell('D13').numFmt, '0');
+      assert.equal(sheet.getCell('V13').value, 600);
+      if (batch.length === 4) {
+        assert.equal(sheet.getCell('V13').numFmt, '"* "0');
+        assert.ok(remarks.includes('* SGIS12AA0747-SA'));
+        assert.ok(remarks.includes('SGIS12DA3251-SA'));
+        assert.ok(remarks.includes('** SGIS12DA3252-SA'));
+      } else {
+        assert.equal(sheet.getCell('V13').numFmt, '0');
+        assert.ok(remarks.includes('SGIS12AA0747-SA'));
+      }
+    }
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('destination normalization and suffix derivation preserve the original ID', () => {
   assert.equal(destination('ASSB BKT RAJA'), 'BUKIT RAJA');
   assert.equal(destination('ASSB BUKIT RAJA'), 'BUKIT RAJA');

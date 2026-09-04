@@ -143,7 +143,7 @@ test('authenticated upload → n8n callbacks → one combined download; duplicat
     await downloaded.xlsx.load(file.rawPayload as unknown as ExcelJS.Buffer);
     assert.equal(downloaded.worksheets.length, 1);
     assert.equal(downloaded.worksheets[0].getCell('V13').value, 1200);
-    assert.equal(downloaded.worksheets[0].getCell('AE17').value, '* SGIS13FA5002-BR');
+    assert.equal(downloaded.worksheets[0].getCell('AE17').value, 'SGIS13FA5002-BR');
     assert.equal(downloaded.worksheets[0].getCell('H16').value, 30);
     assert.equal(downloaded.worksheets[0].getCell('H19').value, null);
     const zip = await app.inject({ url: `/api/jobs/${id}/download-all`, headers });

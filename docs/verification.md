@@ -6,7 +6,8 @@ Verified on 4 September 2026 with Node 24.12.0 on Windows.
 
 ### A4 printing and matching star labels
 
-- Corrected labels so the first PO in every trip is unmarked, the second uses `*`, and the third uses `**`, adding one star for each further PO. Regression checks cover matching quantity/Remarks labels, unmarked first orders in multi-order trips, and shared totals without blank marker lines. A4 settings remain unchanged.
+- Stars now restart within each destination and trip. A lone Bukit Raja or Shah Alam PO remains unmarked. With multiple POs in one destination, HOOK takes the first star ahead of other marked POs, while a non-HOOK base PO stays unmarked. Assignments use item code HU83, not a hardcoded quantity, and remain stable if upload order changes. Remarks width increased from the template minimum to 44 to give starred PO numbers more room.
+- All 17 tests and TypeScript checking passed for the destination-specific update. Checks cover three Shah Alam POs alongside a single Bukit Raja PO, reversed upload order, a HOOK quantity of 600, and a lone PO in each destination. The regenerated original sample was visually reviewed.
 - All 16 tests, TypeScript checking, and the production build passed. Saved workbooks were reopened to verify A4 landscape, one-page fitting, preserved print areas, numeric quantities, and matching PO labels across single-date and multiple-date outputs.
 - Quantity styles are cloned so different PO labels cannot overwrite one another through shared template styles. Multiline number formats preserve XML newline entities when saved, keeping shared-total labels below the number.
 - Rendered sample quantities and bold Remarks were reviewed, including shared totals from two and seven POs. Labels and Remarks fit without clipping. This verifies worksheet layout and saved print settings; no physical printer or Excel print preview was available locally.

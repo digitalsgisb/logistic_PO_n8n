@@ -37,14 +37,30 @@ export async function writeBatch(orders: Order[], template: string, destination:
     sheet.pageSetup.fitToPage = true;
     sheet.pageSetup.fitToWidth = 1;
     sheet.pageSetup.fitToHeight = 1;
+    sheet.getColumn(31).width = Math.max(sheet.getColumn(31).width ?? 0, 44);
     const [year, month, day] = date.split('-');
     sheet.getCell('F4').value = `DATE : ${day}/${month}/${year}`;
     for (let trip = 1; trip <= 10; trip++) {
       const row = 13 + (trip - 1) * 3;
       const tripOrders = orders.filter((order) => order.delivery_date === date && order.trip === trip);
-      const markedOrders = tripOrders.map((order, index) => ({
+      const markersByOrder = new Map<Order, string>();
+      for (const destination of ['BUKIT RAJA', 'SHAH ALAM'] as const) {
+        const group = tripOrders
+          .filter((order) => order.destination === destination)
+          .sort((a, b) => a.kb_number.localeCompare(b.kb_number));
+        if (!group.length) continue;
+        const isHook = (order: Order) => order.items.some((item) => item.item_code === 'HU83');
+        // Each destination has an unmarked base PO. Give HOOK the first star when ambiguous.
+        const base = group.find((order) => !isHook(order)) ?? group[0];
+        markersByOrder.set(base, '');
+        group
+          .filter((order) => order !== base)
+          .sort((a, b) => Number(isHook(b)) - Number(isHook(a)))
+          .forEach((order, index) => markersByOrder.set(order, '*'.repeat(index + 1)));
+      }
+      const markedOrders = tripOrders.map((order) => ({
         order,
-        marker: '*'.repeat(index),
+        marker: markersByOrder.get(order)!,
       }));
       const quantities = new Map<string, { part: string; total: number; markers: string[] }>();
       for (const { order, marker } of markedOrders)
