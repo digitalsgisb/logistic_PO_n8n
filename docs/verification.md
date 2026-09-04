@@ -6,6 +6,7 @@ Verified on 4 September 2026 with Node 24.12.0 on Windows.
 
 ### Company branding and interface update
 
+- Added moving glow and curved wave layers to the green sign-in panel. Browser checks compared animation frames, confirmed stationary heading text, working inputs and mobile layout, and verified that reduced-motion preferences disable both layers. The production build passed.
 - The green sidebar now spans the full viewport height and is 280–320 pixels wide on larger desktops, with a 180-pixel company logo and a slow animated accent. The pale-green header contains the page location and account controls. Smaller screens use a 140-pixel logo in the header.
 - Verified actual scrolling at a 1440 × 620 desktop viewport and 390/320-pixel mobile widths: the main content moves, the header remains at the top, and the desktop sidebar stays at the viewport edge with the header positioned beside it. The sidebar can scroll independently on short screens.
 - Added the supplied company logo to the workspace and sign-in screens, with Digital Transformation Unit footer branding. The logo is bundled locally by Vite and included in the existing web Docker build.

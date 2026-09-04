@@ -69,18 +69,54 @@ svg {
 .login-art::before {
   content: '';
   position: absolute;
-  inset: -60%;
-  z-index: -1;
+  inset: -25%;
+  z-index: -2;
   pointer-events: none;
   background:
-    radial-gradient(ellipse at 25% 40%, #5dd3b52e, transparent 48%),
-    radial-gradient(ellipse at 75% 65%, #a1ead91a, transparent 45%),
-    linear-gradient(120deg, #008f80, #009f8b 50%, #008f7e);
-  animation: brand-gradient 18s ease-in-out infinite alternate;
+    radial-gradient(ellipse at 18% 25%, #6ce1b84d, transparent 48%),
+    radial-gradient(ellipse at 80% 75%, #005b6140, transparent 52%),
+    linear-gradient(135deg, #008f80, #009f8b 50%, #008f7e);
+  animation: login-glow 12s ease-in-out infinite alternate;
 }
-@keyframes brand-gradient {
+.login-art::after {
+  content: '';
+  position: absolute;
+  inset: -35%;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at 5% 95%,
+    transparent 42%,
+    #c5ffdf18 42.1%,
+    transparent 42.35%,
+    transparent 49%,
+    #c5ffdf20 49.1%,
+    transparent 49.35%,
+    transparent 56%,
+    #c5ffdf14 56.1%,
+    transparent 56.35%,
+    transparent 63%,
+    #c5ffdf0f 63.1%,
+    transparent 63.35%
+  );
+  animation: login-waves 16s ease-in-out infinite alternate;
+}
+@keyframes login-glow {
+  from {
+    transform: translate3d(-5%, -4%, 0) scale(1.05);
+  }
   to {
-    transform: translate3d(7%, -5%, 0) rotate(8deg);
+    transform: translate3d(8%, 6%, 0) scale(1.13);
+  }
+}
+@keyframes login-waves {
+  from {
+    transform: translate3d(-3%, 3%, 0) rotate(-6deg);
+    opacity: 0.6;
+  }
+  to {
+    transform: translate3d(5%, -4%, 0) rotate(5deg);
+    opacity: 1;
   }
 }
 .brand {
