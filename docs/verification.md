@@ -4,6 +4,13 @@ Verified on 4 September 2026 with Node 24.12.0 on Windows.
 
 ## Completed checks
 
+### Company branding and interface update
+
+- Added the supplied company logo to the workspace and sign-in screens, with Digital Transformation Unit footer branding. The logo is bundled locally by Vite and included in the existing web Docker build.
+- Reviewed desktop and mobile screenshots of sign-in and combined-workbook results. Browser checks at 1440, 768, 390, and 320 pixels found no horizontal overflow, broken images, or JavaScript errors.
+- Verified file selection/removal, singular file count, disabled empty submission, combined-download links, expandable PO/source details, starting a new batch, and signing out using simulated API responses. These were interface checks, not a new live n8n extraction run.
+- TypeScript checking and the production Vite build passed. Reduced-motion preferences disable the decorative gradient animation.
+
 ### Combined workbook update
 
 - Rechecked the staged update before publishing: all 13 tests, TypeScript checking, and the production Vite build passed. The local npm launcher was unavailable, so the same test/build entry points were run directly with Node.

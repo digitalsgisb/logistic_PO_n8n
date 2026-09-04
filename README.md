@@ -2,7 +2,7 @@
 
 An internal Toyota order converter: upload PDF purchase orders, extract them with local Ollama through n8n, and download one combined kanban workbook for the entire batch.
 
-The interface follows the supplied teal/green design. PO numbers go in Remarks beside their trip: `SGIS12AA0747-SA` for Shah Alam and `SGIS13FA5002-BR` for Bukit Raja. Original order IDs are retained separately for source validation. Orders for the same delivery date share one sheet; batches with multiple dates have one daily sheet per date within the same workbook.
+The interface uses the supplied Sugihara Grand Industries logo, Digital Transformation Unit branding, a subtle animated burgundy gradient, and teal actions. Animation respects reduced-motion preferences. PO numbers go in Remarks beside their trip: `SGIS12AA0747-SA` for Shah Alam and `SGIS13FA5002-BR` for Bukit Raja. Original order IDs are retained separately for source validation. Orders for the same delivery date share one sheet; batches with multiple dates have one daily sheet per date within the same workbook.
 
 ![Toyota PO Converter interface](docs/frontend-preview.png)
 

@@ -1,6 +1,22 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './style.css';
+import companyLogo from './assets/sugihara-logo.png';
+
+function CompanyLogo() {
+  return <img className="company-logo" src={companyLogo} alt="Sugihara Grand Industries Sdn Bhd" />;
+}
+
+function UnitMark() {
+  return (
+    <div className="unit-mark">
+      <span className="copyright-mark" aria-hidden="true">
+        ©
+      </span>
+      <span>Digital Transformation Unit</span>
+    </div>
+  );
+}
 type Result = {
   id: string;
   status: 'ready' | 'review';
@@ -234,7 +250,7 @@ function App() {
     return (
       <div className="login-page">
         <div className="login-art">
-          <div className="brand-mark">S</div>
+          <CompanyLogo />
           <p className="eyebrow">OPERATIONS WORKSPACE</p>
           <h1>
             Less paperwork.
@@ -243,6 +259,7 @@ function App() {
           </h1>
           <p>Turn Toyota purchase orders into your daily kanban template.</p>
           <div className="login-line" />
+          <UnitMark />
         </div>
         <form className="login-form" onSubmit={login}>
           <span className="eyebrow teal">TOYOTA PO CONVERTER</span>
@@ -283,8 +300,8 @@ function App() {
     <div className="app">
       <header className="topbar">
         <a className="brand" href="/" aria-label="Toyota PO Converter home">
-          <span className="brand-mark small">S</span>
-          <span>
+          <CompanyLogo />
+          <span className="brand-workspace">
             Operations<span className="brand-sub">DOCUMENT WORKSPACE</span>
           </span>
         </a>
@@ -326,8 +343,11 @@ function App() {
           </div>
         </div>
         <div className="sidebar-bottom">
-          <span className="status-dot" />
-          Local AI processing
+          <div className="processing-label">
+            <span className="status-dot" />
+            Local AI processing
+          </div>
+          <UnitMark />
         </div>
       </aside>
       <main>
@@ -345,15 +365,21 @@ function App() {
           </span>
         </div>
         <div className="steps">
-          <span className="step">
+          <span className={`step ${!job ? 'current' : 'complete'}`} aria-current={!job ? 'step' : undefined}>
             <b>01</b> Upload PDFs
           </span>
           <span className="step-line" />
-          <span className="step">
+          <span
+            className={`step ${job && !finished.has(job.state) ? 'current' : ready.length ? 'complete' : ''}`}
+            aria-current={job && !finished.has(job.state) ? 'step' : undefined}
+          >
             <b>02</b> Convert orders
           </span>
           <span className="step-line" />
-          <span className="step">
+          <span
+            className={`step ${!busy && ready.length ? 'current' : ''}`}
+            aria-current={!busy && ready.length ? 'step' : undefined}
+          >
             <b>03</b> Download workbook
           </span>
         </div>
@@ -367,10 +393,13 @@ function App() {
             <div className="panel-heading">
               <span className="panel-number">01</span>
               <h2>Your purchase orders</h2>
-              <span className="file-count">{job ? job.files.length : files.length} files</span>
+              <span className="file-count">
+                {job ? job.files.length : files.length}{' '}
+                {(job ? job.files.length : files.length) === 1 ? 'file' : 'files'}
+              </span>
             </div>
             <div
-              className={'dropzone corner-frame ' + (drag ? 'dragging' : '')}
+              className={'dropzone corner-frame ' + (drag ? 'dragging ' : '') + (job ? 'uploaded' : '')}
               onDragOver={(e) => {
                 e.preventDefault();
                 setDrag(true);
@@ -383,15 +412,17 @@ function App() {
               }}
             >
               <div className="upload-icon">
-                <Icon name="upload" size={32} />
+                <Icon name={job ? 'check' : 'upload'} size={32} />
               </div>
               <h3>{job ? 'Your files are uploaded' : 'Drop your PDFs here'}</h3>
               <p>
                 {job ? 'All orders go into one combined workbook.' : 'or choose files from your computer'}
               </p>
-              <button className="outline" disabled={busy || !!job} onClick={() => input.current?.click()}>
-                Browse files
-              </button>
+              {!job && (
+                <button className="outline" disabled={busy} onClick={() => input.current?.click()}>
+                  Browse files
+                </button>
+              )}
               <input
                 ref={input}
                 type="file"
@@ -493,10 +524,17 @@ function App() {
                       ) : (
                         <p>{r.error}</p>
                       )}
-                      {r.order_numbers && (
-                        <small title={r.order_numbers.join('\n')}>{r.order_numbers.join(', ')}</small>
-                      )}
-                      <small title={r.sources.join('\n')}>{r.sources.join(', ')}</small>
+                      <details className="source-details">
+                        <summary>
+                          {r.order_numbers ? 'View included POs and source pages' : 'View source pages'}
+                        </summary>
+                        {r.order_numbers && <p className="order-numbers">{r.order_numbers.join(', ')}</p>}
+                        <ul>
+                          {r.sources.map((source) => (
+                            <li key={source}>{source}</li>
+                          ))}
+                        </ul>
+                      </details>
                     </div>
                     {r.status === 'ready' && (
                       <a
@@ -574,6 +612,9 @@ function App() {
           </span>
           <span>Files available for 7 days</span>
         </footer>
+        <div className="mobile-unit-mark">
+          <UnitMark />
+        </div>
       </main>
     </div>
   );
