@@ -16,3 +16,24 @@ jobs:
       - run: npm run build
       - run: docker build -f Dockerfile.api -t toyota-api:test .
       - run: docker build -f Dockerfile.web -t toyota-web:test .
+      - name: Smoke test production containers
+        run: |
+          docker network create toyota-smoke
+          docker run -d --name api --network toyota-smoke \
+            -e PILOT_PASSWORD=ci-only-password-1234 \
+            -e SESSION_SECRET=ci-only-session-secret-0000000000000000 \
+            -e SERVICE_SECRET=ci-only-service-secret-0000000000000000 \
+            -e N8N_WEBHOOK_URL=http://n8n:5678/webhook/toyota-po \
+            toyota-api:test
+          for i in $(seq 1 20); do
+            if docker exec api node -e "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then break; fi
+            sleep 2
+          done
+          docker run -d --name web --network toyota-smoke toyota-web:test
+          sleep 2
+          docker exec -i api node --input-type=module < scripts/container-smoke.mjs
+      - name: Container logs on failure
+        if: failure()
+        run: |
+          docker logs api || true
+          docker logs web || true
