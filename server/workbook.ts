@@ -44,7 +44,7 @@ export async function writeBatch(orders: Order[], template: string, destination:
       const tripOrders = orders.filter((order) => order.delivery_date === date && order.trip === trip);
       const markedOrders = tripOrders.map((order, index) => ({
         order,
-        marker: tripOrders.length === 1 ? '*' : `*${index + 1}`,
+        marker: tripOrders.length === 1 ? '' : '*'.repeat(index + 1),
       }));
       const quantities = new Map<string, { part: string; total: number; markers: string[] }>();
       for (const { order, marker } of markedOrders)
@@ -70,18 +70,18 @@ export async function writeBatch(orders: Order[], template: string, destination:
         cell.alignment = { ...cell.alignment, wrapText: true, shrinkToFit: false };
         // A literal prefix in the number format keeps the underlying value numeric.
         if (markers.length === 1) {
-          cell.numFmt = `"${markers[0]} "0`;
+          cell.numFmt = markers[0] ? `"${markers[0]} "0` : '0';
         } else {
-          const lines = [];
-          for (let index = 0; index < markers.length; index += 2)
-            lines.push(markers.slice(index, index + 2).join(' '));
+          const lines = markers;
           cell.numFmt = `0"\n${lines.join('\n')}"`;
           sheet.getRow(row).height = Math.max(sheet.getRow(row).height ?? 15, (lines.length + 1) * 24 + 6);
         }
       }
 
       // Use the three existing Remarks cells next to each trip; KB and DO rows stay blank.
-      const numbers = markedOrders.map(({ order, marker }) => `${marker} ${order.kb_number}`);
+      const numbers = markedOrders.map(({ order, marker }) =>
+        marker ? `${marker} ${order.kb_number}` : order.kb_number,
+      );
       let offset = 0;
       for (let i = 0; i < 3; i++) {
         const count = Math.ceil((numbers.length - offset) / (3 - i));

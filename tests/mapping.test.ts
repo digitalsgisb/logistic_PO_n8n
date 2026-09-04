@@ -39,10 +39,10 @@ test('four sample orders produce one daily sheet with nine quantities and PO num
     assert.equal(s.getCell('H10').value, null);
     assert.equal(s.getCell('C13').value, null);
     assert.equal(s.getCell('V13').value, 1200);
-    assert.equal(s.getCell('AE13').value, '*1 SGIS12AA0747-SA');
-    assert.equal(s.getCell('AE14').value, '*2 SGIS12DA3251-SA');
-    assert.equal(s.getCell('AE16').value, '*1 SGIS12DA3252-SA');
-    assert.equal(s.getCell('AE17').value, '*2 SGIS13FA5002-BR');
+    assert.equal(s.getCell('AE13').value, '* SGIS12AA0747-SA');
+    assert.equal(s.getCell('AE14').value, '** SGIS12DA3251-SA');
+    assert.equal(s.getCell('AE16').value, '* SGIS12DA3252-SA');
+    assert.equal(s.getCell('AE17').value, '** SGIS13FA5002-BR');
     assert.equal(s.getCell('H16').value, 30);
     assert.equal(s.getCell('H19').value, null);
     assert.equal(s.getCell('AE19').value, null);
@@ -55,9 +55,9 @@ test('four sample orders produce one daily sheet with nine quantities and PO num
     assert.equal(s.pageSetup.fitToPage, true);
     assert.equal(s.pageSetup.fitToWidth, 1);
     assert.equal(s.pageSetup.fitToHeight, 1);
-    assert.equal(s.getCell('V13').numFmt, '"*1 "0');
-    assert.equal(s.getCell('W13').numFmt, '"*2 "0');
-    assert.equal(s.getCell('D16').numFmt, '"*2 "0');
+    assert.equal(s.getCell('V13').numFmt, '"* "0');
+    assert.equal(s.getCell('W13').numFmt, '"** "0');
+    assert.equal(s.getCell('D16').numFmt, '"** "0');
     assert.ok(s.model.merges.includes('D6:U6'));
   } finally {
     await fs.rm(dir, { recursive: true, force: true });
@@ -88,10 +88,10 @@ test('shared item and trip quantities add without overwriting; dates stay on sep
       second = wb.worksheets[1];
     assert.equal(first.getCell('V13').value, 2400);
     assert.equal(second.getCell('V13').value, 1200);
-    assert.equal(first.getCell('V13').numFmt, '0"\n*1 *2"');
-    assert.equal(second.getCell('V13').numFmt, '"* "0');
-    assert.equal(first.getCell('AE14').value, '*2 SGIS12AA0748-SA');
-    assert.equal(second.getCell('AE13').value, '* SGIS12AA0749-SA');
+    assert.equal(first.getCell('V13').numFmt, '0"\n*\n**"');
+    assert.equal(second.getCell('V13').numFmt, '0');
+    assert.equal(first.getCell('AE14').value, '** SGIS12AA0748-SA');
+    assert.equal(second.getCell('AE13').value, 'SGIS12AA0749-SA');
     assert.equal(second.getCell('AE14').value, null);
     assert.equal(second.getCell('F4').value, 'DATE : 04/09/2026');
     assert.deepEqual(first.model.merges, second.model.merges);
@@ -107,10 +107,10 @@ test('shared item and trip quantities add without overwriting; dates stay on sep
     await many.xlsx.readFile(file);
     const sheet = many.worksheets[0];
     assert.equal(sheet.getCell('V13').value, 8400);
-    assert.equal(sheet.getCell('V13').numFmt, '0"\n*1 *2\n*3 *4\n*5 *6\n*7"');
+    assert.equal(sheet.getCell('V13').numFmt, '0"\n*\n**\n***\n****\n*****\n******\n*******"');
     assert.deepEqual(
       [13, 14, 15].flatMap((r) => String(sheet.getCell(r, 31).value).split('\n')),
-      crowded.map((o, i) => `*${i + 1} ${o.kb_number}`),
+      crowded.map((o, i) => `${'*'.repeat(i + 1)} ${o.kb_number}`),
     );
     assert.ok(sheet.getRow(13).height! >= 84);
     sameTrip.items[0].part_number = 'XXXXX-XXXXX-XX';
