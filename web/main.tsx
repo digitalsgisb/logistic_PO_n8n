@@ -365,7 +365,7 @@ function App() {
           <div>
             <div className="eyebrow teal">PURCHASE ORDERS, SIMPLIFIED</div>
             <h1>Toyota PO Converter</h1>
-            <p>Upload your orders. Download one combined kanban workbook.</p>
+            <p>Upload your orders. Download one kanban workbook per delivery date.</p>
           </div>
           <span className="pilot-pill">
             TOYOTA <span>PILOT</span>
@@ -387,7 +387,7 @@ function App() {
             className={`step ${!busy && ready.length ? 'current' : ''}`}
             aria-current={!busy && ready.length ? 'step' : undefined}
           >
-            <b>03</b> Download workbook
+            <b>03</b> Download workbooks
           </span>
         </div>
         {error && (
@@ -423,7 +423,9 @@ function App() {
               </div>
               <h3>{job ? 'Your files are uploaded' : 'Drop your PDFs here'}</h3>
               <p>
-                {job ? 'All orders go into one combined workbook.' : 'or choose files from your computer'}
+                {job
+                  ? 'Orders for the same date go into one workbook.'
+                  : 'or choose files from your computer'}
               </p>
               {!job && (
                 <button className="outline" disabled={busy} onClick={() => input.current?.click()}>
@@ -494,7 +496,7 @@ function App() {
           <section className="panel output-panel">
             <div className="panel-heading">
               <span className="panel-number">02</span>
-              <h2>Your combined workbook</h2>
+              <h2>Your daily workbooks</h2>
               <span className="file-count">{ready.length} ready</span>
             </div>
             {!job || (!finished.has(job.state) && !job.results.length) ? (
@@ -502,11 +504,11 @@ function App() {
                 <div className={'output-icon ' + (busy ? 'processing' : '')}>
                   <Icon name={busy ? 'grid' : 'file'} size={36} />
                 </div>
-                <h3>{busy ? 'Preparing your workbook' : 'Ready when you are'}</h3>
+                <h3>{busy ? 'Preparing your daily workbooks' : 'Ready when you are'}</h3>
                 <p>
                   {busy
                     ? 'We’re reading and checking each order.'
-                    : 'Your combined Excel workbook will appear here.'}
+                    : 'Your Excel files will appear here, one per delivery date.'}
                 </p>
                 <span className="xlsx-chip">XLSX</span>
               </div>
@@ -519,7 +521,9 @@ function App() {
                     </span>
                     <div className="result-info">
                       <strong>
-                        {r.order_count ? 'Combined Toyota orders' : (r.kb_number ?? r.order_id)}
+                        {r.order_count
+                          ? `Toyota orders · ${r.date?.split('-').reverse().join('/') ?? 'Workbook'}`
+                          : (r.kb_number ?? r.order_id)}
                       </strong>
                       {r.status === 'ready' ? (
                         <small>
@@ -547,7 +551,7 @@ function App() {
                       <a
                         className="download-one"
                         href={`/api/jobs/${job.id}/outputs/${r.id}`}
-                        aria-label={`Download ${r.order_count ? 'combined workbook' : (r.kb_number ?? r.order_id)}`}
+                        aria-label={`Download ${r.order_count ? `workbook for ${r.date ?? 'these orders'}` : (r.kb_number ?? r.order_id)}`}
                       >
                         <Icon name="download" size={20} />
                       </a>
@@ -608,7 +612,7 @@ function App() {
             )}
             <div className="panel-foot">
               <Icon name="check" size={15} />
-              <span>One workbook per batch · PO numbers in Remarks</span>
+              <span>One workbook per delivery date · PO numbers in Remarks</span>
             </div>
           </section>
         </div>

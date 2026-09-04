@@ -5,7 +5,7 @@ import { Store } from './store.ts';
 import { config } from './config.ts';
 import { readPdf } from './pdf.ts';
 import { assemble, hash } from './mapping.ts';
-import { batchFilename, writeBatch } from './workbook.ts';
+import { batchFilename, ordersByDate, writeBatch } from './workbook.ts';
 import type { Job, Extraction } from './types.ts';
 const running = new Set(['reading', 'processing', 'generating']);
 export class Engine {
@@ -159,7 +159,7 @@ export class Engine {
   }
   async finish(job: Job) {
     job.state = 'generating';
-    job.stage = 'Generating combined Excel workbook';
+    job.stage = 'Generating Excel workbooks by delivery date';
     this.store.save(job);
     const { orders, errors } = assemble(job.pages);
     const results = [...errors];
@@ -172,36 +172,36 @@ export class Engine {
           error: file.error,
           sources: [file.filename],
         });
-    if (orders.length) {
-      const id = 'combined';
-      const filename = batchFilename(orders),
+    for (const [date, dailyOrders] of ordersByDate(orders)) {
+      const id = `date-${date}`;
+      const filename = batchFilename(dailyOrders),
         out = path.join(this.options.dataDir, job.id, filename),
         temporary = `${out}.${randomUUID()}.tmp`,
-        sources = [...new Set(orders.flatMap((order) => order.source_pages))];
+        sources = [...new Set(dailyOrders.flatMap((order) => order.source_pages))];
       try {
         // Always rebuild from validated orders; retry never adds onto an old output.
-        await writeBatch(orders, this.options.template, temporary);
+        await writeBatch(dailyOrders, this.options.template, temporary);
         await fs.rename(temporary, out);
-        const dates = [...new Set(orders.map((order) => order.delivery_date))].sort();
         results.push({
           id,
           status: 'ready',
-          order_id: 'Combined Toyota orders',
-          order_count: orders.length,
-          order_numbers: orders.map((order) => order.kb_number),
-          destination: [...new Set(orders.map((order) => order.destination))].join(' / '),
-          date: dates.length === 1 ? dates[0] : undefined,
-          dates,
+          order_id: `Toyota orders — ${date}`,
+          order_count: dailyOrders.length,
+          order_numbers: dailyOrders.map((order) => order.kb_number),
+          destination: [...new Set(dailyOrders.map((order) => order.destination))].join(' / '),
+          date,
+          dates: [date],
           filename,
           path: out,
           sources,
-          source_page_ids: orders.flatMap((order) => order.source_page_ids),
+          source_page_ids: dailyOrders.flatMap((order) => order.source_page_ids),
         });
       } catch (e) {
         results.push({
           id,
           status: 'review',
-          order_id: 'Combined Toyota orders',
+          order_id: `Toyota orders — ${date}`,
+          date,
           error: e instanceof Error ? e.message : String(e),
           sources,
         });
@@ -216,7 +216,9 @@ export class Engine {
     job.state = successes ? (results.some((r) => r.status === 'review') ? 'partial' : 'completed') : 'failed';
     job.stage =
       job.state === 'completed'
-        ? 'Your combined workbook is ready'
+        ? successes === 1
+          ? 'Your daily workbook is ready'
+          : 'Your daily workbooks are ready'
         : successes
           ? 'Completed with items to review'
           : 'Review required';

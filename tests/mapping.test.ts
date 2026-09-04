@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import ExcelJS from 'exceljs';
 import { assemble, destination, kbNumber, validatePage, headers } from '../server/mapping.ts';
-import { batchFilename, writeBatch } from '../server/workbook.ts';
+import { batchFilename, ordersByDate, writeBatch } from '../server/workbook.ts';
 import { readPdf } from '../server/pdf.ts';
 import { orders, pageFor, pdfFor, textFor } from './helpers.ts';
 
@@ -65,7 +65,7 @@ test('four sample orders produce one daily sheet with nine quantities and PO num
   }
 });
 
-test('shared item and trip quantities add without overwriting; dates stay on separate daily sheets', async () => {
+test('shared quantities add within a date; different dates produce separate workbooks', async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'toyota-combined-'));
   try {
     const a = validatePage(pageFor().extraction, pageFor());
@@ -78,15 +78,26 @@ test('shared item and trip quantities add without overwriting; dates stay on sep
       delivery_sequence: '2026090401',
     };
     const file = path.join(dir, 'combined.xlsx');
-    await writeBatch([a, sameTrip, otherDate], 'templates/toyota.xlsx', file);
-    const wb = new ExcelJS.Workbook();
-    await wb.xlsx.readFile(file);
+    const groups = ordersByDate([otherDate, a, sameTrip]);
     assert.deepEqual(
-      wb.worksheets.map((s) => s.name),
+      groups.map(([date]) => date),
       ['2026-09-03', '2026-09-04'],
     );
-    const first = wb.worksheets[0],
-      second = wb.worksheets[1];
+    const sheets = [];
+    for (const [, dailyOrders] of groups) {
+      const dailyFile = path.join(dir, batchFilename(dailyOrders));
+      await writeBatch(dailyOrders, 'templates/toyota.xlsx', dailyFile);
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.readFile(dailyFile);
+      assert.equal(wb.worksheets.length, 1);
+      assert.equal(wb.worksheets[0].name, 'ASSB2016');
+      sheets.push(wb.worksheets[0]);
+    }
+    const [first, second] = sheets;
+    await assert.rejects(
+      writeBatch([a, otherDate], 'templates/toyota.xlsx', file),
+      /exactly one delivery date/,
+    );
     assert.equal(first.getCell('V13').value, 2400);
     assert.equal(second.getCell('V13').value, 1200);
     assert.equal(first.getCell('V13').numFmt, '0"\n*"');

@@ -6,12 +6,24 @@ import { headers } from './mapping.ts';
 
 export function batchFilename(orders: Order[]) {
   const dates = [...new Set(orders.map((order) => order.delivery_date))].sort();
-  return `Toyota_${dates.length === 1 ? dates[0] : `${dates[0]}_to_${dates.at(-1)}`}_Combined.xlsx`;
+  if (dates.length !== 1) throw new Error('Each workbook must contain exactly one delivery date.');
+  return `Toyota_${dates[0]}_Combined.xlsx`;
+}
+
+export function ordersByDate(orders: Order[]): [string, Order[]][] {
+  const groups = new Map<string, Order[]>();
+  for (const order of orders) {
+    const group = groups.get(order.delivery_date) ?? [];
+    group.push(order);
+    groups.set(order.delivery_date, group);
+  }
+  return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
 }
 
 /** Orders are validated and deduplicated by assemble before reaching this writer. */
 export async function writeBatch(orders: Order[], template: string, destination: string) {
   if (!orders.length) throw new Error('No valid orders to include in the workbook.');
+  batchFilename(orders); // Reject mixed dates even when the caller supplies a custom filename.
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.readFile(template);
   const original = wb.getWorksheet('ASSB2016');
@@ -20,17 +32,10 @@ export async function writeBatch(orders: Order[], template: string, destination:
     if (String(original.getCell(8, map.column).value) !== code)
       throw new Error(`Template header mismatch: ${code}.`);
 
-  // Each delivery date keeps its own daily template inside the one workbook.
-  const sourceModel = structuredClone(original.model);
+  // Each output contains one daily template; the engine groups orders before calling this writer.
   const dates = [...new Set(orders.map((order) => order.delivery_date))].sort();
-  for (const [index, date] of dates.entries()) {
-    const name = dates.length === 1 ? 'ASSB2016' : date;
-    const sheet = index === 0 ? original : wb.addWorksheet(name);
-    if (index > 0) {
-      sheet.model = { ...structuredClone(sourceModel), id: sheet.id, name };
-      for (const range of sourceModel.merges) sheet.mergeCells(range);
-    }
-    sheet.name = name;
+  for (const date of dates) {
+    const sheet = original;
     // Force every generated daily sheet to one A4 landscape page.
     sheet.pageSetup.paperSize = 9;
     sheet.pageSetup.orientation = 'landscape';

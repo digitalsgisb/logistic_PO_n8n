@@ -1,8 +1,8 @@
 # Toyota PO Converter
 
-An internal Toyota order converter: upload PDF purchase orders, extract them with local Ollama through n8n, and download one combined kanban workbook for the entire batch.
+An internal Toyota order converter: upload PDF purchase orders, extract them with local Ollama through n8n, and download one combined kanban workbook per delivery date.
 
-The interface uses a compact Sugihara Grand Industries logo, Digital Transformation Unit branding, and the original green/teal palette with a subtle animated gradient. The header and desktop sidebar stay fixed while content scrolls. Animation respects reduced-motion preferences. PO numbers go in Remarks beside their trip: `SGIS12AA0747-SA` for Shah Alam and `SGIS13FA5002-BR` for Bukit Raja. Original order IDs are retained separately for source validation. Orders for the same delivery date share one sheet; batches with multiple dates have one daily sheet per date within the same workbook.
+The interface uses a compact Sugihara Grand Industries logo, Digital Transformation Unit branding, and the original green/teal palette with a subtle animated gradient. The header and desktop sidebar stay fixed while content scrolls. Animation respects reduced-motion preferences. PO numbers go in Remarks beside their trip: `SGIS12AA0747-SA` for Shah Alam and `SGIS13FA5002-BR` for Bukit Raja. Original order IDs are retained separately for source validation. Orders for the same delivery date share one Excel file, even across different PDFs. A PDF or batch containing two delivery dates produces two files, each with one daily sheet. Download them individually or together as a ZIP.
 
 ![Toyota PO Converter interface](docs/frontend-preview.png)
 
@@ -132,7 +132,7 @@ Outputs go to `outputs/combined-live-sample/`. Without `--live`, the sample scri
 - Suffixed PO numbers appear once per order in column AE (Remarks), within that trip's three rows, in bold 20-point text. Wrapped Remarks rows expand when needed. KB NO, DO.NO, ETA, and outstanding cells remain blank.
 - Matching stars are assigned separately within each delivery date, trip, and destination. A destination with only one PO has no marker. With multiple POs, one base PO stays unmarked and the others use `*`, `**`, etc. HOOK (HU83, shown as 1200 in the sample) receives the first star when paired with a non-HOOK PO. PO-number ordering makes assignments independent of upload order. Shared quantities list contributing nonempty labels below the total; quantity cells remain numeric for calculations.
 - Every generated daily sheet uses A4 landscape with the template print area fitted to one page wide and one page tall. Pull and rebuild the API (`docker compose up -d --build`), then start a new batch to apply these settings and star labels to downloads.
-- The header date comes from the source. Each date gets a daily template sheet in the same workbook. A single-date batch retains the `ASSB2016` sheet name.
+- The header date comes from the source delivery date. Each date gets a separate `Toyota_YYYY-MM-DD_Combined.xlsx` file containing the `ASSB2016` daily sheet. Other dates appearing on the PDF do not create extra outputs.
 - Repeated order pages are deduplicated; missing pages and conflicting versions require review. Source orders remain separate in extraction records. Within one order, repeated matching items are summed only when part and pack details agree.
 - Matching source identifiers and numeric values is mandatory. Unknown destinations/codes/routes, ambiguous dates, missing items, and quantity discrepancies do not produce a ready workbook.
 
@@ -152,7 +152,7 @@ The initial bundled template was prepared from the source BIFF cells, styles, di
 
 - Only text-based PDFs are supported. Scanned and password-protected PDFs need an original/unlocked copy.
 - Defaults: 20 files, 20 MB each, 100 MB per batch, and 100 pages per file. When increasing the batch limit, also increase Nginx's `client_max_body_size` in `deploy/nginx.conf`.
-- Partial batches offer one workbook of valid orders alongside review errors. Retry only reprocesses unsuccessful pages, then rebuilds the combined workbook from all valid orders without double-counting.
+- Partial batches offer daily workbooks of valid orders alongside review errors. Retry only reprocesses unsuccessful pages, then rebuilds each date's workbook from all valid orders without double-counting. A generation error for one date does not prevent other dates from producing downloads.
 - “Unable to start processing”: verify the workflow is published, network/service names resolve, and the service secret matches.
 - “No response from processing”: inspect n8n execution logs; fix the model/connection issue, then retry. The timeout defaults to 15 minutes without page progress.
 - A review error caused by incorrect source data requires a corrected upload; the pilot does not include an in-browser editor.

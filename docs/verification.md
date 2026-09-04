@@ -4,6 +4,12 @@ Verified on 4 September 2026 with Node 24.12.0 on Windows.
 
 ## Completed checks
 
+### Separate output files by delivery date
+
+- All 17 tests, TypeScript checking, and the production build passed. The API upload test covers a single PDF with four POs across two delivery dates, two separately downloadable Excel files containing only their respective orders, and a ZIP containing exactly those two files. The existing one-date PDF still produces one output, and restart/retry preserves successful quantities without duplication.
+- The writer rejects mixed-date input; the engine and sample generator group validated orders by delivery date before writing. Each output retains a single ASSB2016 sheet, A4 settings, and the destination-specific star rules. Ready outputs have date-specific IDs and filenames.
+- Updated interface wording and download labels to describe one workbook per delivery date. Pull and rebuild both API and web, then start a new batch; existing completed files are not regenerated automatically. Earlier multiple-date sheet behavior below is superseded by this change.
+
 ### A4 printing and matching star labels
 
 - Stars now restart within each destination and trip. A lone Bukit Raja or Shah Alam PO remains unmarked. With multiple POs in one destination, HOOK takes the first star ahead of other marked POs, while a non-HOOK base PO stays unmarked. Assignments use item code HU83, not a hardcoded quantity, and remain stable if upload order changes. Remarks width increased from the template minimum to 44 to give starred PO numbers more room.

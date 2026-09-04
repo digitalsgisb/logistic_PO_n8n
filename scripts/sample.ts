@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { readPdf } from '../server/pdf.ts';
 import { assemble, hash } from '../server/mapping.ts';
-import { batchFilename, writeBatch } from '../server/workbook.ts';
+import { batchFilename, ordersByDate, writeBatch } from '../server/workbook.ts';
 import fixtures from '../tests/fixtures/orders.json' with { type: 'json' };
 import type { Page } from '../server/types.ts';
 const live = process.argv.includes('--live'),
@@ -59,7 +59,9 @@ await fs.writeFile(
 );
 const { orders, errors } = assemble(pages);
 if (errors.length) throw new Error(JSON.stringify(errors, null, 2));
-await writeBatch(orders, 'templates/toyota.xlsx', path.join(output, batchFilename(orders)));
+const dailyGroups = ordersByDate(orders);
+for (const [, dailyOrders] of dailyGroups)
+  await writeBatch(dailyOrders, 'templates/toyota.xlsx', path.join(output, batchFilename(dailyOrders)));
 console.log(
-  `Created one workbook with ${orders.length} orders and ${orders.reduce((s, o) => s + o.items.length, 0)} item lines in ${output}.`,
+  `Created ${dailyGroups.length} daily workbook(s) with ${orders.length} orders and ${orders.reduce((s, o) => s + o.items.length, 0)} item lines in ${output}.`,
 );

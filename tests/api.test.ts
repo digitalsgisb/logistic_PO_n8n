@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import ExcelJS from 'exceljs';
+import JSZip from 'jszip';
 import { buildApp } from '../server/app.ts';
 import { config } from '../server/config.ts';
 import { orders, pdfFor, textFor } from './helpers.ts';
@@ -165,6 +166,69 @@ test('authenticated upload → n8n callbacks → one combined download; duplicat
       409,
     );
     const bad = multipart([{ name: 'bad.pdf', bytes: Buffer.from('not pdf') }]);
+    // A single PDF may contain several delivery dates; downloads must split by date.
+    const datedOrders = orders.map((order, i) => ({
+      ...structuredClone(order),
+      delivery_date: i < 2 ? '2026-09-03' : '2026-09-04',
+    }));
+    const datedForm = multipart([
+      {
+        name: 'two-dates.pdf',
+        bytes: pdfFor(
+          datedOrders.map((order, i) =>
+            i < 2
+              ? textFor(order)
+              : textFor(order).replaceAll('20260903', '20260904').replaceAll('03/09/2026', '04/09/2026'),
+          ),
+        ),
+      },
+    ]);
+    const datedUpload = await app.inject({
+      method: 'POST',
+      url: '/api/jobs',
+      headers: { ...headers, 'content-type': datedForm.type },
+      payload: datedForm.payload,
+    });
+    assert.equal(datedUpload.statusCode, 202, datedUpload.body);
+    const datedId = datedUpload.json().id;
+    await engine.tick();
+    const datedAttempt = store.get(datedId)!.attempt;
+    for (const order of datedOrders) {
+      const claimed = await engine.claim(datedId, datedAttempt);
+      assert.ok('page_id' in claimed);
+      assert.ok(claimed.page_id);
+      engine.result(datedId, datedAttempt, claimed.page_id, order);
+    }
+    await engine.claim(datedId, datedAttempt);
+    const datedStatus = (await app.inject({ url: `/api/jobs/${datedId}`, headers })).json();
+    assert.equal(datedStatus.state, 'completed');
+    assert.equal(datedStatus.results.length, 2);
+    for (const [index, result] of datedStatus.results.entries()) {
+      assert.equal(result.date, index === 0 ? '2026-09-03' : '2026-09-04');
+      assert.equal(result.order_count, 2);
+      assert.deepEqual(
+        result.order_numbers,
+        index === 0 ? ['SGIS12AA0747-SA', 'SGIS12DA3251-SA'] : ['SGIS12DA3252-SA', 'SGIS13FA5002-BR'],
+      );
+      const dailyDownload = await app.inject({ url: `/api/jobs/${datedId}/outputs/${result.id}`, headers });
+      assert.equal(dailyDownload.statusCode, 200);
+      const daily = new ExcelJS.Workbook();
+      await daily.xlsx.load(dailyDownload.rawPayload as unknown as ExcelJS.Buffer);
+      assert.equal(daily.worksheets.length, 1);
+      assert.equal(
+        daily.worksheets[0].getCell('F4').value,
+        index === 0 ? 'DATE : 03/09/2026' : 'DATE : 04/09/2026',
+      );
+      assert.equal(daily.worksheets[0].getCell('V13').value, index === 0 ? 1200 : null);
+      assert.equal(daily.worksheets[0].getCell('H16').value, index === 0 ? null : 30);
+    }
+    const dailyZip = await app.inject({ url: `/api/jobs/${datedId}/download-all`, headers });
+    assert.equal(dailyZip.statusCode, 200);
+    const archive = await JSZip.loadAsync(dailyZip.rawPayload);
+    assert.deepEqual(Object.keys(archive.files).sort(), [
+      'Toyota_2026-09-03_Combined.xlsx',
+      'Toyota_2026-09-04_Combined.xlsx',
+    ]);
     assert.equal(
       (
         await app.inject({
