@@ -29,8 +29,8 @@ Edit `.env` locally. Set:
 | ----------------- | ---------------------------------------------------------------------------------------------------------- |
 | `N8N_NETWORK`     | Existing n8n Docker network, shown by `docker network ls`                                                  |
 | `N8N_WEBHOOK_URL` | Production webhook, usually `http://n8n:5678/webhook/toyota-po`; use the existing container's service name |
-| `BIND_IP`         | `100.109.37.96` on the AI Atom server; `127.0.0.1` for a local-only deployment                             |
-| `WEB_PORT`        | `8088` unless already occupied                                                                             |
+| `BIND_IP`         | `127.0.0.1` for the local tunnel origin; use `100.109.37.96` only when direct Tailscale access is required |
+| `WEB_PORT`        | `3500`                                                                                                  |
 | `PILOT_USERNAME`  | Shared pilot account name, default `pilot`                                                                 |
 | `COOKIE_SECURE`   | `false` for HTTP over Tailscale; `true` behind HTTPS                                                       |
 
@@ -54,7 +54,25 @@ docker compose ps
 docker compose logs --tail=80 api
 ```
 
-Open **http://100.109.37.96:8088** through Tailscale and sign in with the account from `.env`. Upload the sample PDF and verify one downloadable workbook containing four orders and nine item lines.
+Open **http://127.0.0.1:3500** on the server, or use the hostname configured in your tunnel, and sign in with the account from `.env`. Upload the sample PDF and verify one downloadable workbook containing four orders and nine item lines.
+
+### Existing deployment: switch to localhost:3500
+
+Pull the update and edit the existing `.env` on the server. Preserve its credentials and n8n settings; change only:
+
+```dotenv
+BIND_IP=127.0.0.1
+WEB_PORT=3500
+```
+
+Apply the new port mapping:
+
+```bash
+docker compose up -d --no-deps web
+curl -I http://127.0.0.1:3500
+```
+
+Set the `logistic.sugidigital.org` tunnel route to service type **HTTP** and URL **localhost:3500**. The connector must share the server's network namespace for this localhost address to work. This replaces the app's old port 8088 mapping; other tunnel routes retain their own service settings. Existing `.env` files override Compose defaults, so pulling the repository alone does not change a deployed port.
 
 ### Updates and persistent data
 
