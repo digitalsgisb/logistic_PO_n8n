@@ -45,7 +45,7 @@ svg {
 }
 .app {
   --header-height: 76px;
-  --sidebar-width: 236px;
+  --sidebar-width: clamp(280px, 21vw, 320px);
   min-height: 100vh;
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
@@ -53,7 +53,7 @@ svg {
 }
 .topbar {
   position: fixed;
-  inset: 0 0 auto;
+  inset: 0 0 auto var(--sidebar-width);
   height: var(--header-height);
   z-index: 20;
   isolation: isolate;
@@ -61,11 +61,11 @@ svg {
   align-items: center;
   justify-content: space-between;
   padding: 0 32px;
-  color: #fff;
-  background: #009f8b;
+  color: #214b43;
+  background: #edf6f2;
+  border-bottom: 1px solid #dce9e2;
   overflow: hidden;
 }
-.topbar::before,
 .login-art::before {
   content: '';
   position: absolute;
@@ -85,9 +85,29 @@ svg {
 }
 .brand {
   display: flex;
-  align-items: center;
-  gap: 22px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 20px;
   min-width: 0;
+  margin: 0 14px 38px;
+}
+.mobile-brand {
+  display: none;
+}
+.header-context {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 13px;
+}
+.header-context > span {
+  color: #688276;
+}
+.header-context svg {
+  color: #8ca799;
+}
+.header-context strong {
+  font-weight: 650;
 }
 .company-logo {
   display: block;
@@ -96,9 +116,7 @@ svg {
   object-fit: contain;
 }
 .brand-workspace {
-  border-left: 1px solid #ffffff35;
-  padding-left: 22px;
-  font-size: 17px;
+  font-size: 22px;
   font-weight: 600;
 }
 .brand-sub {
@@ -115,46 +133,62 @@ svg {
   gap: 18px;
 }
 .private-label {
-  font-size: 10px;
-  letter-spacing: 1.5px;
-  color: #d7f1eb;
+  color: #647f70;
+  letter-spacing: 0.2px;
+  font-size: 12px;
 }
 .avatar {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: #ffffff12;
-  border: 1px solid #ffffff30;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid #dbe8e0;
   font-size: 12px;
 }
 .signout {
-  color: #fff;
-  background: transparent;
-  border: 1px solid #ffffff30;
+  color: #256250;
+  background: #fff;
+  border: 1px solid #d6e5dc;
   border-radius: 7px;
   font-size: 12px;
   padding: 9px 14px;
   transition: background 0.2s;
 }
 .signout:hover {
-  background: #ffffff15;
+  background: #dcefe4;
 }
 .sidebar {
   position: fixed;
-  top: var(--header-height);
+  top: 0;
   bottom: 0;
   left: 0;
   width: var(--sidebar-width);
   z-index: 10;
+  isolation: isolate;
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: var(--dark);
+  background: linear-gradient(155deg, #104e48, #126659 56%, #087a66);
   color: #fff;
-  padding: 34px 18px 22px;
+  padding: 30px 22px 24px;
   display: flex;
   flex-direction: column;
+}
+.sidebar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(165deg, transparent 42%, #9ee9c80c 42.2%, #9ee9c816 70%, transparent 70.2%);
+  background-size: 100% 160%;
+  animation: sidebar-drift 20s ease-in-out infinite alternate;
+}
+@keyframes sidebar-drift {
+  to {
+    background-position: 0 100%;
+  }
 }
 .sidebar > * {
   flex-shrink: 0;
@@ -170,10 +204,10 @@ svg {
   align-items: center;
   gap: 12px;
   border: 1px solid #ffffff19;
-  background: #ffffff0b;
-  border-radius: 9px;
-  padding: 14px;
-  font-size: 13px;
+  padding: 18px;
+  font-size: 15px;
+  border-radius: 11px;
+  background: #ffffff13;
 }
 .nav-active svg {
   color: #8dd6c8;
@@ -204,7 +238,7 @@ svg {
   font-size: 9px;
 }
 .sidebar-note p {
-  font-size: 19px;
+  font-size: 21px;
   line-height: 1.7;
   font-weight: 400;
   color: #e0f0e9;
@@ -277,21 +311,12 @@ main {
 .app main :is(button, input, a, summary) {
   scroll-margin-block: calc(var(--header-height) + 16px);
 }
-.breadcrumb {
-  display: flex;
-  gap: 10px;
-  font-size: 11px;
-  color: #6f817d;
-}
-.breadcrumb span {
-  color: #bcc8c4;
-}
 .page-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  margin-top: 30px;
+  margin-top: 12px;
 }
 .teal {
   color: #007b6c;
@@ -896,12 +921,11 @@ h3 {
 }
 @media (max-width: 1150px) {
   .app {
-    --sidebar-width: 208px;
+    --sidebar-width: 250px;
   }
   main {
     padding: 26px;
   }
-  .brand-workspace,
   .private-label {
     display: none;
   }
@@ -938,7 +962,25 @@ h3 {
     display: none;
   }
   .topbar {
+    left: 0;
     padding: 0 24px;
+  }
+  .mobile-brand {
+    display: block;
+    background: var(--dark);
+    border-radius: 8px;
+    padding: 6px 10px;
+  }
+  .mobile-brand .company-logo {
+    width: 140px;
+  }
+  .header-context {
+    margin-right: auto;
+    margin-left: 22px;
+  }
+  .header-context > span,
+  .header-context svg {
+    display: none;
   }
   .company-logo {
     width: 170px;
@@ -965,6 +1007,9 @@ h3 {
   }
   .topbar {
     padding: 0 18px;
+  }
+  .header-context {
+    display: none;
   }
   .company-logo {
     width: 160px;

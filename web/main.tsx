@@ -299,15 +299,19 @@ function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <a className="brand" href="/" aria-label="Toyota PO Converter home">
+        <a className="mobile-brand" href="/" aria-label="Toyota PO Converter home">
           <CompanyLogo />
-          <span className="brand-workspace">
-            Operations<span className="brand-sub">DOCUMENT WORKSPACE</span>
-          </span>
         </a>
+        <nav className="header-context" aria-label="Breadcrumb">
+          <span>Operations</span>
+          <Icon name="arrow" size={15} />
+          <strong>PO Converter</strong>
+        </nav>
         <div className="top-right">
-          <span className="private-label">PRIVATE WORKSPACE</span>
-          <span className="avatar">{session.username[0].toUpperCase()}</span>
+          <span className="private-label">{session.username}</span>
+          <span className="avatar" aria-label={`Signed in as ${session.username}`}>
+            {session.username[0].toUpperCase()}
+          </span>
           <button
             className="signout"
             onClick={async () => {
@@ -323,6 +327,12 @@ function App() {
         </div>
       </header>
       <aside className="sidebar">
+        <a className="brand" href="/" aria-label="Toyota PO Converter home">
+          <CompanyLogo />
+          <span className="brand-workspace">
+            Operations<span className="brand-sub">TOYOTA DOCUMENT WORKSPACE</span>
+          </span>
+        </a>
         <p className="nav-label">WORKSPACE</p>
         <div className="nav-active">
           <Icon name="grid" />
@@ -351,9 +361,6 @@ function App() {
         </div>
       </aside>
       <main>
-        <div className="breadcrumb">
-          Workspace <span>/</span> PO Converter
-        </div>
         <div className="page-heading">
           <div>
             <div className="eyebrow teal">PURCHASE ORDERS, SIMPLIFIED</div>
