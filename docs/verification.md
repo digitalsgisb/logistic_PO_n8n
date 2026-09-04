@@ -6,6 +6,8 @@ Verified on 4 September 2026 with Node 24.12.0 on Windows.
 
 ### Company branding and interface update
 
+- Restored the green/teal palette and reduced the header logo from 260 to 180 pixels (150–170 pixels on smaller screens). The sign-in logo is also smaller.
+- Verified actual scrolling at a 1440 × 620 desktop viewport and 390/320-pixel mobile widths: the main content moves, the header remains at the top, and the desktop sidebar stays between the header and viewport bottom. The sidebar can scroll independently on short screens.
 - Added the supplied company logo to the workspace and sign-in screens, with Digital Transformation Unit footer branding. The logo is bundled locally by Vite and included in the existing web Docker build.
 - Reviewed desktop and mobile screenshots of sign-in and combined-workbook results. Browser checks at 1440, 768, 390, and 320 pixels found no horizontal overflow, broken images, or JavaScript errors.
 - Verified file selection/removal, singular file count, disabled empty submission, combined-download links, expandable PO/source details, starting a new batch, and signing out using simulated API responses. These were interface checks, not a new live n8n extraction run.

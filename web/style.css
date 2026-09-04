@@ -5,9 +5,8 @@
   font-synthesis: none;
   font-weight: 400;
   --teal: #008575;
-  --dark: #153e3a;
+  --dark: #12554e;
   --muted: #617571;
-  --wine: #7d2030;
 }
 * {
   box-sizing: border-box;
@@ -45,21 +44,25 @@ svg {
   flex-shrink: 0;
 }
 .app {
+  --header-height: 76px;
+  --sidebar-width: 236px;
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 236px minmax(0, 1fr);
-  grid-template-rows: 88px 1fr;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  grid-template-rows: var(--header-height) 1fr;
 }
 .topbar {
-  grid-column: 1 / -1;
-  position: relative;
+  position: fixed;
+  inset: 0 0 auto;
+  height: var(--header-height);
+  z-index: 20;
   isolation: isolate;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 32px;
   color: #fff;
-  background: #661c29;
+  background: #009f8b;
   overflow: hidden;
 }
 .topbar::before,
@@ -70,9 +73,9 @@ svg {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(ellipse at 25% 40%, #b8425260, transparent 48%),
-    radial-gradient(ellipse at 75% 65%, #d2a47322, transparent 45%),
-    linear-gradient(120deg, #561624, #862736 50%, #471523);
+    radial-gradient(ellipse at 25% 40%, #5dd3b52e, transparent 48%),
+    radial-gradient(ellipse at 75% 65%, #a1ead91a, transparent 45%),
+    linear-gradient(120deg, #008f80, #009f8b 50%, #008f7e);
   animation: brand-gradient 18s ease-in-out infinite alternate;
 }
 @keyframes brand-gradient {
@@ -83,18 +86,18 @@ svg {
 .brand {
   display: flex;
   align-items: center;
-  gap: 28px;
+  gap: 22px;
   min-width: 0;
 }
 .company-logo {
   display: block;
-  width: 260px;
+  width: 180px;
   height: auto;
   object-fit: contain;
 }
 .brand-workspace {
   border-left: 1px solid #ffffff35;
-  padding-left: 28px;
+  padding-left: 22px;
   font-size: 17px;
   font-weight: 600;
 }
@@ -104,7 +107,7 @@ svg {
   letter-spacing: 1.9px;
   margin-top: 5px;
   font-weight: 500;
-  color: #e8cdd0;
+  color: #ccece5;
 }
 .top-right {
   display: flex;
@@ -114,7 +117,7 @@ svg {
 .private-label {
   font-size: 10px;
   letter-spacing: 1.5px;
-  color: #efd8dc;
+  color: #d7f1eb;
 }
 .avatar {
   display: grid;
@@ -139,19 +142,28 @@ svg {
   background: #ffffff15;
 }
 .sidebar {
-  grid-column: 1;
-  grid-row: 2;
-  background: #251f28;
+  position: fixed;
+  top: var(--header-height);
+  bottom: 0;
+  left: 0;
+  width: var(--sidebar-width);
+  z-index: 10;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--dark);
   color: #fff;
   padding: 34px 18px 22px;
   display: flex;
   flex-direction: column;
 }
+.sidebar > * {
+  flex-shrink: 0;
+}
 .nav-label {
   font-size: 10px;
   letter-spacing: 1.8px;
   margin: 0 14px 18px;
-  color: #b6a7b0;
+  color: #add1c8;
 }
 .nav-active {
   display: flex;
@@ -164,7 +176,7 @@ svg {
   font-size: 13px;
 }
 .nav-active svg {
-  color: #e6a7b1;
+  color: #8dd6c8;
 }
 .nav-dot {
   width: 6px;
@@ -179,7 +191,7 @@ svg {
 .side-rule {
   width: 30px;
   height: 2px;
-  background: #ae626f;
+  background: #6baea0;
   margin-bottom: 26px;
 }
 .eyebrow {
@@ -188,14 +200,14 @@ svg {
   font-weight: 650;
 }
 .sidebar-note > .eyebrow {
-  color: #c9acb4;
+  color: #a4cfc3;
   font-size: 9px;
 }
 .sidebar-note p {
   font-size: 19px;
   line-height: 1.7;
   font-weight: 400;
-  color: #f0e8ed;
+  color: #e0f0e9;
   margin: 16px 0;
 }
 .plant-tags {
@@ -209,7 +221,7 @@ svg {
   border: 1px solid #ffffff22;
   border-radius: 5px;
   padding: 6px 8px;
-  color: #d3c7cf;
+  color: #bedfd5;
 }
 .sidebar-bottom {
   margin-top: auto;
@@ -219,7 +231,7 @@ svg {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #c4b9c0;
+  color: #b8d9cf;
   font-size: 11px;
   padding: 0 12px 24px;
 }
@@ -235,7 +247,7 @@ svg {
   gap: 9px;
   padding: 18px 10px 0;
   border-top: 1px solid #ffffff20;
-  color: #d6a6af;
+  color: #b3d5c9;
   font-size: 9px;
   line-height: 1.6;
   letter-spacing: 1.6px;
@@ -254,11 +266,16 @@ svg {
   letter-spacing: 0;
 }
 main {
+  grid-column: 2;
+  grid-row: 2;
   min-width: 0;
   width: 100%;
   max-width: 1600px;
   margin: 0 auto;
   padding: 28px 38px 24px;
+}
+.app main :is(button, input, a, summary) {
+  scroll-margin-block: calc(var(--header-height) + 16px);
 }
 .breadcrumb {
   display: flex;
@@ -298,18 +315,18 @@ h1 {
   align-items: center;
   font-size: 11px;
   letter-spacing: 1.2px;
-  border: 1px solid #e3d9dc;
+  border: 1px solid #d8e3db;
   background: #fff;
   padding: 11px 14px;
   border-radius: 7px;
   white-space: nowrap;
-  color: var(--wine);
+  color: #28796b;
 }
 .pilot-pill span {
   margin-left: 10px;
   padding-left: 10px;
-  border-left: 1px solid #e8dde0;
-  color: #7f6e74;
+  border-left: 1px solid #dae4dd;
+  color: #6d8176;
   font-size: 9px;
 }
 .steps {
@@ -772,7 +789,7 @@ h3 {
   isolation: isolate;
   overflow: hidden;
   color: #fff;
-  background: #661c29;
+  background: var(--dark);
   padding: 10vh 12%;
   display: flex;
   flex-direction: column;
@@ -780,11 +797,11 @@ h3 {
   align-items: flex-start;
 }
 .login-art .company-logo {
-  width: min(100%, 355px);
+  width: min(100%, 240px);
 }
 .login-art > .eyebrow {
   margin-top: 70px;
-  color: #e8bdc4;
+  color: #c2e8dc;
 }
 .login-art h1 {
   font-size: clamp(36px, 4vw, 56px);
@@ -794,7 +811,7 @@ h3 {
   color: #fff;
 }
 .login-art > p:not(.eyebrow) {
-  color: #edcdd2;
+  color: #d3eee4;
   font-size: 15px;
   line-height: 1.8;
   max-width: 310px;
@@ -802,7 +819,7 @@ h3 {
 .login-line {
   width: 64px;
   height: 3px;
-  background: #d2a177;
+  background: #8edbbd;
   margin-top: 28px;
 }
 .login-art .unit-mark {
@@ -879,7 +896,7 @@ h3 {
 }
 @media (max-width: 1150px) {
   .app {
-    grid-template-columns: 208px minmax(0, 1fr);
+    --sidebar-width: 208px;
   }
   main {
     padding: 26px;
@@ -911,8 +928,11 @@ h3 {
 }
 @media (max-width: 900px) {
   .app {
+    --header-height: 72px;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: 78px 1fr;
+  }
+  main {
+    grid-column: 1;
   }
   .sidebar {
     display: none;
@@ -921,19 +941,19 @@ h3 {
     padding: 0 24px;
   }
   .company-logo {
-    width: 235px;
+    width: 170px;
   }
   .mobile-unit-mark {
     display: block;
   }
   .mobile-unit-mark .unit-mark {
-    color: #925563;
-    border-color: #e2d9dc;
+    color: #4d8070;
+    border-color: #d7e3dc;
     justify-content: center;
     margin-top: 24px;
   }
   .mobile-unit-mark .copyright-mark {
-    background: #f0e4e7;
+    background: #e3efe8;
   }
   .login-art {
     padding: 9vh 10%;
@@ -941,13 +961,13 @@ h3 {
 }
 @media (max-width: 680px) {
   .app {
-    grid-template-rows: 76px 1fr;
+    --header-height: 68px;
   }
   .topbar {
     padding: 0 18px;
   }
   .company-logo {
-    width: 210px;
+    width: 160px;
   }
   .top-right {
     gap: 8px;
@@ -1030,7 +1050,7 @@ h3 {
     padding: 24px 26px;
   }
   .login-art .company-logo {
-    width: 260px;
+    width: 200px;
     max-width: 100%;
   }
   .login-art > .eyebrow,
@@ -1051,7 +1071,7 @@ h3 {
 }
 @media (max-width: 370px) {
   .company-logo {
-    width: 180px;
+    width: 150px;
   }
   .topbar {
     padding: 0 14px;
