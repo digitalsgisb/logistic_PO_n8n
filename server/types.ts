@@ -50,6 +50,9 @@ export interface Result {
   kb_number?: string;
   destination?: string;
   date?: string;
+  dates?: string[];
+  order_count?: number;
+  order_numbers?: string[];
   filename?: string;
   path?: string;
   error?: string;

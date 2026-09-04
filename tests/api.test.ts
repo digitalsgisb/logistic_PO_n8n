@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
+import ExcelJS from 'exceljs';
 import { buildApp } from '../server/app.ts';
 import { config } from '../server/config.ts';
 import { orders, pdfFor, textFor } from './helpers.ts';
@@ -22,7 +23,7 @@ function multipart(files: { name: string; bytes: Buffer }[]) {
     type: `multipart/form-data; boundary=${boundary}`,
   };
 }
-test('authenticated upload → n8n callbacks → four downloads; duplicates, ZIP, persistence, stale callback protection', async () => {
+test('authenticated upload → n8n callbacks → one combined download; duplicates, ZIP, persistence, stale callback protection', async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'toyota-api-'));
   const receiver = http.createServer((_req, res) => {
     res.end('ok');
@@ -127,16 +128,25 @@ test('authenticated upload → n8n callbacks → four downloads; duplicates, ZIP
     assert.equal(done.json().done, true, done.body);
     const status = await app.inject({ url: `/api/jobs/${id}`, headers });
     assert.equal(status.json().state, 'completed', status.body);
-    assert.equal(status.json().results.length, 4);
-    assert.equal(status.json().results[0].kb_number, 'SGIS12AA0747-SA');
-    assert.equal(status.json().results[3].kb_number, 'SGIS13FA5002-BR');
+    assert.equal(status.json().results.length, 1);
+    assert.equal(status.json().results[0].order_count, 4);
+    assert.deepEqual(status.json().results[0].order_numbers, [
+      'SGIS12AA0747-SA',
+      'SGIS12DA3251-SA',
+      'SGIS12DA3252-SA',
+      'SGIS13FA5002-BR',
+    ]);
     const file = await app.inject({ url: `/api/jobs/${id}/outputs/${status.json().results[0].id}`, headers });
     assert.equal(file.statusCode, 200);
     assert.equal(file.rawPayload.subarray(0, 2).toString(), 'PK');
+    const downloaded = new ExcelJS.Workbook();
+    await downloaded.xlsx.load(file.rawPayload as unknown as ExcelJS.Buffer);
+    assert.equal(downloaded.worksheets.length, 1);
+    assert.equal(downloaded.worksheets[0].getCell('V13').value, 1200);
+    assert.equal(downloaded.worksheets[0].getCell('AE19').value, 'SGIS13FA5002-BR');
     const zip = await app.inject({ url: `/api/jobs/${id}/download-all`, headers });
     assert.equal(zip.statusCode, 200);
-    assert.ok(zip.rawPayload.includes(Buffer.from('SGIS12AA0747-SA.xlsx')));
-    assert.ok(zip.rawPayload.includes(Buffer.from('SGIS13FA5002-BR.xlsx')));
+    assert.ok(zip.rawPayload.includes(Buffer.from('Toyota_2026-09-03_Combined.xlsx')));
     assert.equal(
       (
         await app.inject({
@@ -171,7 +181,7 @@ test('authenticated upload → n8n callbacks → four downloads; duplicates, ZIP
   }
 });
 
-test('partial results survive restart and retry without duplicating successful orders', async () => {
+test('partial results survive restart and retry rebuilds one workbook without duplicating successful quantities', async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'toyota-retry-'));
   const options = { ...config, dataDir: dir };
   let instance = await buildApp(options);
@@ -203,7 +213,6 @@ test('partial results survive restart and retry without duplicating successful o
     await instance.engine.finish(instance.store.get(id)!);
     assert.equal(instance.store.get(id)!.state, 'partial');
     const readyPath = instance.store.get(id)!.results.find((r) => r.status === 'ready')!.path!;
-    const original = await fs.readFile(readyPath);
     await instance.app.close();
     instance = await buildApp(options);
     assert.equal(instance.store.get(id)!.results.filter((r) => r.status === 'ready').length, 1);
@@ -218,8 +227,14 @@ test('partial results survive restart and retry without duplicating successful o
     instance.engine.result(id, job.attempt, 'b', orders[3]);
     await instance.engine.claim(id, job.attempt);
     assert.equal(instance.store.get(id)!.state, 'completed');
-    assert.equal(instance.store.get(id)!.results.length, 2);
-    assert.deepEqual(await fs.readFile(readyPath), original);
+    assert.equal(instance.store.get(id)!.results.length, 1);
+    assert.equal(instance.store.get(id)!.results[0].order_count, 2);
+    assert.equal(instance.store.get(id)!.results[0].path, readyPath);
+    const combined = new ExcelJS.Workbook();
+    await combined.xlsx.readFile(readyPath);
+    assert.equal(combined.worksheets[0].getCell('V13').value, 1200);
+    assert.equal(combined.worksheets[0].getCell('H19').value, 30);
+    assert.equal(combined.worksheets[0].getCell('AE19').value, 'SGIS13FA5002-BR');
     const interrupted = instance.store.get(id)!;
     interrupted.state = 'processing';
     instance.store.save(interrupted);

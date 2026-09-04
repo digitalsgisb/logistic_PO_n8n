@@ -4,6 +4,17 @@ Verified on 4 September 2026 with Node 24.12.0 on Windows.
 
 ## Completed checks
 
+### Combined workbook update
+
+- Rechecked the staged update before publishing: all 13 tests, TypeScript checking, and the production Vite build passed. The local npm launcher was unavailable, so the same test/build entry points were run directly with Node.
+- Regenerated the combined sample from `TOYOTA PO.pdf` using fixture extraction values and inspected the rendered daily sheet and Remarks. All four POs and nine item lines are in one workbook. The photo is a layout reference; quantities and trip assignments follow the source POs (including Bukit Raja route `WM02-03`, which belongs to Trip 3).
+- Thirteen local tests pass, including one download containing all four sample orders and nine quantities, original trip assignments, suffixed PO numbers in Remarks, blank KB rows, duplicate uploads, and restart/retry without doubled quantities.
+- Shared item/trip totals, multiple delivery dates in one workbook, copied sheet merges and print settings, and more than three PO numbers in one trip are covered.
+- The combined layout was generated from the supplied PDF text with the known extraction fixtures and visually reviewed. This output change does not modify the extraction model or the existing n8n workflow.
+- The user reported successful processing through their deployed n8n instance before requesting this change. The earlier checks below describe the original per-order implementation.
+
+### Original implementation
+
 - TypeScript checking and production Vite build passed.
 - Linux tests and both production Docker image builds passed in [GitHub Actions](https://github.com/digitalsgisb/logistic_PO_n8n/actions/runs/33833978028).
 - Automated API and mapping tests passed, covering four orders and all nine line items, destination suffixes, source validation, PDF overlay deduplication, multi-page orders, duplicate uploads, partial success, restart/retry, authenticated downloads, ZIP generation, and stale callbacks.

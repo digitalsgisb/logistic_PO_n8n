@@ -5,11 +5,11 @@ import os from 'node:os';
 import path from 'node:path';
 import ExcelJS from 'exceljs';
 import { assemble, destination, kbNumber, validatePage, headers } from '../server/mapping.ts';
-import { writeOrder } from '../server/workbook.ts';
+import { batchFilename, writeBatch } from '../server/workbook.ts';
 import { readPdf } from '../server/pdf.ts';
 import { orders, pageFor, pdfFor, textFor } from './helpers.ts';
 
-test('all four sample orders map to the expected trip, quantity, and suffixed KB cells', async () => {
+test('four sample orders produce one daily sheet with nine quantities and PO numbers in Remarks', async () => {
   const pages = orders.map((o, i) => ({ ...pageFor(o, String(i)), number: i + 1 }));
   const result = assemble(pages);
   assert.deepEqual(result.errors, []);
@@ -20,26 +20,88 @@ test('all four sample orders map to the expected trip, quantity, and suffixed KB
   );
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'toyota-workbooks-'));
   try {
-    for (const order of result.orders) {
-      const file = path.join(dir, order.kb_number + '.xlsx');
-      await writeOrder(order, 'templates/toyota.xlsx', file);
-      const wb = new ExcelJS.Workbook();
-      await wb.xlsx.readFile(file);
-      assert.equal(wb.worksheets.length, 1);
-      const s = wb.getWorksheet('ASSB2016')!;
-      assert.equal(s.getCell('F4').value, 'DATE : 03/09/2026');
+    const file = path.join(dir, batchFilename(result.orders));
+    await writeBatch(result.orders, 'templates/toyota.xlsx', file);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.readFile(file);
+    assert.equal(wb.worksheets.length, 1);
+    const s = wb.getWorksheet('ASSB2016')!;
+    assert.equal(s.getCell('F4').value, 'DATE : 03/09/2026');
+    for (const order of result.orders)
       for (const item of order.items) {
         const row = 13 + (order.trip - 1) * 3,
           col = headers[item.item_code].column;
         assert.equal(s.getCell(row, col).value, item.total_quantity);
-        assert.equal(s.getCell(row + 1, col).value, order.kb_number);
+        assert.equal(s.getCell(row + 1, col).value, null);
         assert.equal(s.getCell(row + 2, col).value, null);
       }
-      assert.equal(s.getCell('A25').value, 'TRIP 5');
-      assert.equal(s.getCell('H10').value, null);
-      assert.equal(s.getCell('C13').value, null);
-      assert.equal(s.getCell('V13').value, order.source_order_id === 'SGIS12AA0747' ? 1200 : null);
-    }
+    assert.equal(s.getCell('A25').value, 'TRIP 5');
+    assert.equal(s.getCell('H10').value, null);
+    assert.equal(s.getCell('C13').value, null);
+    assert.equal(s.getCell('V13').value, 1200);
+    assert.equal(s.getCell('AE13').value, 'SGIS12AA0747-SA');
+    assert.equal(s.getCell('AE14').value, 'SGIS12DA3251-SA');
+    assert.equal(s.getCell('AE16').value, 'SGIS12DA3252-SA');
+    assert.equal(s.getCell('AE19').value, 'SGIS13FA5002-BR');
+    assert.equal(s.getCell('AE15').value, null);
+    assert.equal(s.pageSetup.printArea, 'A4:AE42');
+    assert.equal(s.pageSetup.orientation, 'landscape');
+    assert.ok(s.model.merges.includes('D6:U6'));
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('shared item and trip quantities add without overwriting; dates stay on separate daily sheets', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'toyota-combined-'));
+  try {
+    const a = validatePage(pageFor().extraction, pageFor());
+    const sameTrip = { ...structuredClone(a), source_order_id: 'SGIS12AA0748', kb_number: 'SGIS12AA0748-SA' };
+    const otherDate = {
+      ...structuredClone(a),
+      source_order_id: 'SGIS12AA0749',
+      kb_number: 'SGIS12AA0749-SA',
+      delivery_date: '2026-09-04',
+    };
+    const file = path.join(dir, 'combined.xlsx');
+    await writeBatch([a, sameTrip, otherDate], 'templates/toyota.xlsx', file);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.readFile(file);
+    assert.deepEqual(
+      wb.worksheets.map((s) => s.name),
+      ['2026-09-03', '2026-09-04'],
+    );
+    const first = wb.worksheets[0],
+      second = wb.worksheets[1];
+    assert.equal(first.getCell('V13').value, 2400);
+    assert.equal(second.getCell('V13').value, 1200);
+    assert.equal(first.getCell('AE14').value, 'SGIS12AA0748-SA');
+    assert.equal(second.getCell('AE13').value, 'SGIS12AA0749-SA');
+    assert.equal(second.getCell('AE14').value, null);
+    assert.equal(second.getCell('F4').value, 'DATE : 04/09/2026');
+    assert.deepEqual(first.model.merges, second.model.merges);
+    assert.deepEqual(first.pageSetup, second.pageSetup);
+    assert.equal(first.getColumn(31).width, second.getColumn(31).width);
+    const crowded = Array.from({ length: 7 }, (_, i) => ({
+      ...structuredClone(a),
+      source_order_id: `SGIS12AA${8000 + i}`,
+      kb_number: `SGIS12AA${8000 + i}-SA`,
+    }));
+    await writeBatch(crowded, 'templates/toyota.xlsx', file);
+    const many = new ExcelJS.Workbook();
+    await many.xlsx.readFile(file);
+    const sheet = many.worksheets[0];
+    assert.equal(sheet.getCell('V13').value, 8400);
+    assert.deepEqual(
+      [13, 14, 15].flatMap((r) => String(sheet.getCell(r, 31).value).split('\n')),
+      crowded.map((o) => o.kb_number),
+    );
+    assert.ok(sheet.getRow(13).height! >= 60);
+    sameTrip.items[0].part_number = 'XXXXX-XXXXX-XX';
+    await assert.rejects(
+      writeBatch([a, sameTrip], 'templates/toyota.xlsx', file),
+      /Conflicting part numbers/,
+    );
   } finally {
     await fs.rm(dir, { recursive: true, force: true });
   }

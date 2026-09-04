@@ -8,6 +8,9 @@ type Result = {
   kb_number?: string;
   destination?: string;
   date?: string;
+  dates?: string[];
+  order_count?: number;
+  order_numbers?: string[];
   filename?: string;
   error?: string;
   sources: string[];
@@ -335,7 +338,7 @@ function App() {
           <div>
             <div className="eyebrow teal">PURCHASE ORDERS, SIMPLIFIED</div>
             <h1>Toyota PO Converter</h1>
-            <p>Upload your orders. Download your completed kanban templates.</p>
+            <p>Upload your orders. Download one combined kanban workbook.</p>
           </div>
           <span className="pilot-pill">
             TOYOTA <span>PILOT</span>
@@ -351,7 +354,7 @@ function App() {
           </span>
           <span className="step-line" />
           <span className="step">
-            <b>03</b> Download templates
+            <b>03</b> Download workbook
           </span>
         </div>
         {error && (
@@ -383,7 +386,9 @@ function App() {
                 <Icon name="upload" size={32} />
               </div>
               <h3>{job ? 'Your files are uploaded' : 'Drop your PDFs here'}</h3>
-              <p>{job ? 'Each order becomes a separate template.' : 'or choose files from your computer'}</p>
+              <p>
+                {job ? 'All orders go into one combined workbook.' : 'or choose files from your computer'}
+              </p>
               <button className="outline" disabled={busy || !!job} onClick={() => input.current?.click()}>
                 Browse files
               </button>
@@ -451,7 +456,7 @@ function App() {
           <section className="panel output-panel">
             <div className="panel-heading">
               <span className="panel-number">02</span>
-              <h2>Your templates</h2>
+              <h2>Your combined workbook</h2>
               <span className="file-count">{ready.length} ready</span>
             </div>
             {!job || (!finished.has(job.state) && !job.results.length) ? (
@@ -459,11 +464,11 @@ function App() {
                 <div className={'output-icon ' + (busy ? 'processing' : '')}>
                   <Icon name={busy ? 'grid' : 'file'} size={36} />
                 </div>
-                <h3>{busy ? 'Preparing your templates' : 'Ready when you are'}</h3>
+                <h3>{busy ? 'Preparing your workbook' : 'Ready when you are'}</h3>
                 <p>
                   {busy
                     ? 'We’re reading and checking each order.'
-                    : 'Your completed Excel templates will appear here.'}
+                    : 'Your combined Excel workbook will appear here.'}
                 </p>
                 <span className="xlsx-chip">XLSX</span>
               </div>
@@ -475,13 +480,21 @@ function App() {
                       <Icon name={r.status === 'ready' ? 'file' : 'info'} />
                     </span>
                     <div className="result-info">
-                      <strong>{r.kb_number ?? r.order_id}</strong>
+                      <strong>
+                        {r.order_count ? 'Combined Toyota orders' : (r.kb_number ?? r.order_id)}
+                      </strong>
                       {r.status === 'ready' ? (
                         <small>
-                          {r.destination} · {r.date?.split('-').reverse().join('/')}
+                          {r.order_count ? `${r.order_count} orders · ` : ''}
+                          {(r.dates ?? (r.date ? [r.date] : []))
+                            .map((date) => date.split('-').reverse().join('/'))
+                            .join(', ')}
                         </small>
                       ) : (
                         <p>{r.error}</p>
+                      )}
+                      {r.order_numbers && (
+                        <small title={r.order_numbers.join('\n')}>{r.order_numbers.join(', ')}</small>
                       )}
                       <small title={r.sources.join('\n')}>{r.sources.join(', ')}</small>
                     </div>
@@ -489,7 +502,7 @@ function App() {
                       <a
                         className="download-one"
                         href={`/api/jobs/${job.id}/outputs/${r.id}`}
-                        aria-label={`Download ${r.kb_number}`}
+                        aria-label={`Download ${r.order_count ? 'combined workbook' : (r.kb_number ?? r.order_id)}`}
                       >
                         <Icon name="download" size={20} />
                       </a>
@@ -517,7 +530,13 @@ function App() {
                 {job?.error && <p className="processing-error">{job.error}</p>}
               </div>
             )}
-            {ready.length > 0 && (
+            {ready.length === 1 && (
+              <a className="primary download-all" href={`/api/jobs/${job!.id}/outputs/${ready[0].id}`}>
+                <Icon name="download" size={18} />
+                {job?.state === 'partial' ? 'Download workbook (valid orders)' : 'Download Excel workbook'}
+              </a>
+            )}
+            {ready.length > 1 && (
               <a className="primary download-all" href={`/api/jobs/${job!.id}/download-all`}>
                 <Icon name="download" size={18} />
                 Download all ZIP <span>{ready.length}</span>
@@ -544,7 +563,7 @@ function App() {
             )}
             <div className="panel-foot">
               <Icon name="check" size={15} />
-              <span>One template per order · SA / BR automatically added</span>
+              <span>One workbook per batch · PO numbers in Remarks</span>
             </div>
           </section>
         </div>

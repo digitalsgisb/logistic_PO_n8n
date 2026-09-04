@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { readPdf } from '../server/pdf.ts';
 import { assemble, hash } from '../server/mapping.ts';
-import { writeOrder } from '../server/workbook.ts';
+import { batchFilename, writeBatch } from '../server/workbook.ts';
 import fixtures from '../tests/fixtures/orders.json' with { type: 'json' };
 import type { Page } from '../server/types.ts';
 const live = process.argv.includes('--live'),
@@ -11,7 +11,7 @@ const texts = await readPdf(await fs.readFile(source));
 const pages: Page[] = [];
 const prompt = await fs.readFile('workflows/extraction-prompt.txt', 'utf8');
 const schema = JSON.parse(await fs.readFile('workflows/extraction-schema.json', 'utf8'));
-const output = live ? 'outputs/live-sample' : 'outputs/fixture-sample';
+const output = live ? 'outputs/combined-live-sample' : 'outputs/combined-fixture-sample';
 await fs.mkdir(output, { recursive: true });
 for (const [i, text] of texts.entries()) {
   console.log(`Extracting page ${i + 1}/${texts.length} (${live ? 'live Ollama' : 'known test fixture'})`);
@@ -59,12 +59,7 @@ await fs.writeFile(
 );
 const { orders, errors } = assemble(pages);
 if (errors.length) throw new Error(JSON.stringify(errors, null, 2));
-for (const order of orders)
-  await writeOrder(
-    order,
-    'templates/toyota.xlsx',
-    path.join(output, `Toyota_${order.delivery_date}_${order.kb_number}.xlsx`),
-  );
+await writeBatch(orders, 'templates/toyota.xlsx', path.join(output, batchFilename(orders)));
 console.log(
-  `Created ${orders.length} workbooks with ${orders.reduce((s, o) => s + o.items.length, 0)} item lines in ${output}.`,
+  `Created one workbook with ${orders.length} orders and ${orders.reduce((s, o) => s + o.items.length, 0)} item lines in ${output}.`,
 );

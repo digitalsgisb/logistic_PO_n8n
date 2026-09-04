@@ -1,8 +1,8 @@
 # Toyota PO Converter
 
-An internal Toyota order converter: upload PDF purchase orders, extract them with local Ollama through n8n, and download a separate completed kanban workbook for each order.
+An internal Toyota order converter: upload PDF purchase orders, extract them with local Ollama through n8n, and download one combined kanban workbook for the entire batch.
 
-The interface follows the supplied teal/green design. Outputs use `SGIS12AA0747-SA` for Shah Alam and `SGIS13FA5002-BR` for Bukit Raja. Original order IDs are retained separately for source validation.
+The interface follows the supplied teal/green design. PO numbers go in Remarks beside their trip: `SGIS12AA0747-SA` for Shah Alam and `SGIS13FA5002-BR` for Bukit Raja. Original order IDs are retained separately for source validation. Orders for the same delivery date share one sheet; batches with multiple dates have one daily sheet per date within the same workbook.
 
 ![Toyota PO Converter interface](docs/frontend-preview.png)
 
@@ -54,7 +54,7 @@ docker compose ps
 docker compose logs --tail=80 api
 ```
 
-Open **http://100.109.37.96:8088** through Tailscale and sign in with the account from `.env`. Upload the sample PDF and verify four downloadable workbooks.
+Open **http://100.109.37.96:8088** through Tailscale and sign in with the account from `.env`. Upload the sample PDF and verify one downloadable workbook containing four orders and nine item lines.
 
 ### Updates and persistent data
 
@@ -64,6 +64,8 @@ docker compose up -d --build
 ```
 
 Jobs, original uploads, extracted values, and outputs are stored in the `toyota-data` volume. Back up that volume if required. Do not use `docker compose down -v` when keeping jobs. New application versions preserve the volume; interrupted work is marked retryable after restart. Files and job records expire after seven days by default.
+
+For the combined-output update, keep your working `.env`, Compose networking changes, and n8n workflow URLs. Only the application needs rebuilding. Completed jobs keep their existing downloads; choose **Start new batch** and upload the PDFs again to get the new combined layout. Retried partial jobs rebuild a single workbook from all valid orders.
 
 ## Local development
 
@@ -98,16 +100,17 @@ To test the original sample with the real AI model, place `TOYOTA PO.pdf` in the
 OLLAMA_URL=http://100.109.37.96:11434 npm run sample -- --live
 ```
 
-Outputs go to `outputs/live-sample/`. Without `--live`, the sample script uses known fixture extraction values and labels the output accordingly; that mode tests mapping and rendering, not AI accuracy.
+Outputs go to `outputs/combined-live-sample/`. Without `--live`, the sample script uses known fixture extraction values in `outputs/combined-fixture-sample/`; that mode tests mapping and rendering, not AI accuracy.
 
 ## Mapping and template
 
 - The template is `templates/toyota.xlsx`, containing only `ASSB2016`.
 - Item-code headers map deterministically to columns D–AD. Bukit Raja occupies D–U and Shah Alam V–AD.
 - Trip quantity rows begin at 13 and repeat every three rows. `WS02-NN` and `WM02-NN` support trips 1–10. HU83 uses `WS02-01` even when `PA1-10` is also printed.
-- `QTY` uses total pieces. `KB NO` uses the original SGIS ID plus a destination-derived suffix. KB rows expand to 30 points and use wrapped 8-point text so the complete identifier remains visible within its column.
-- The header date comes from the source. DO.NO, ETA, remarks, and outstanding cells remain blank.
-- Repeated order pages are deduplicated; missing pages and conflicting versions require review. Different orders remain separate. Within one order, repeated matching items are summed only when part and pack details agree.
+- `QTY` uses total pieces. Orders sharing a delivery date, trip, and item code are added into that quantity cell; conflicting part numbers require review.
+- Suffixed PO numbers appear once per order in column AE (Remarks), within that trip's three rows. Wrapped Remarks rows expand when needed. KB NO, DO.NO, ETA, and outstanding cells remain blank.
+- The header date comes from the source. Each date gets a daily template sheet in the same workbook. A single-date batch retains the `ASSB2016` sheet name.
+- Repeated order pages are deduplicated; missing pages and conflicting versions require review. Source orders remain separate in extraction records. Within one order, repeated matching items are summed only when part and pack details agree.
 - Matching source identifiers and numeric values is mandatory. Unknown destinations/codes/routes, ambiguous dates, missing items, and quantity discrepancies do not produce a ready workbook.
 
 ### Rebuilding the legacy template
@@ -126,7 +129,7 @@ The initial bundled template was prepared from the source BIFF cells, styles, di
 
 - Only text-based PDFs are supported. Scanned and password-protected PDFs need an original/unlocked copy.
 - Defaults: 20 files, 20 MB each, 100 MB per batch, and 100 pages per file. When increasing the batch limit, also increase Nginx's `client_max_body_size` in `deploy/nginx.conf`.
-- Partial batches keep successful downloads. Retry only reprocesses unsuccessful pages and does not rewrite successful outputs.
+- Partial batches offer one workbook of valid orders alongside review errors. Retry only reprocesses unsuccessful pages, then rebuilds the combined workbook from all valid orders without double-counting.
 - “Unable to start processing”: verify the workflow is published, network/service names resolve, and the service secret matches.
 - “No response from processing”: inspect n8n execution logs; fix the model/connection issue, then retry. The timeout defaults to 15 minutes without page progress.
 - A review error caused by incorrect source data requires a corrected upload; the pilot does not include an in-browser editor.
