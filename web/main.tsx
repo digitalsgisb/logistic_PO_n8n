@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './style.css';
 import companyLogo from './assets/sugihara-logo.png';
+import { Tagging } from './Tagging';
 
 function CompanyLogo() {
   return <img className="company-logo" src={companyLogo} alt="Sugihara Grand Industries Sdn Bhd" />;
@@ -334,11 +335,15 @@ function App() {
           </span>
         </a>
         <p className="nav-label">WORKSPACE</p>
-        <div className="nav-active">
+        <a className="nav-active" href="#po-converter">
           <Icon name="grid" />
           <span>PO Converter</span>
           <span className="nav-dot" />
-        </div>
+        </a>
+        <a className="nav-active tag-nav" href="#rack-tagging">
+          <Icon name="file" />
+          <span>Rack tagging & print</span>
+        </a>
         <div className="sidebar-note">
           <div className="side-rule" />
           <span className="eyebrow">TOYOTA PILOT</span>
@@ -361,7 +366,7 @@ function App() {
         </div>
       </aside>
       <main>
-        <div className="page-heading">
+        <div className="page-heading" id="po-converter">
           <div>
             <div className="eyebrow teal">PURCHASE ORDERS, SIMPLIFIED</div>
             <h1>Toyota PO Converter</h1>
@@ -616,6 +621,14 @@ function App() {
             </div>
           </section>
         </div>
+        <a className="tag-mobile-link" href="#rack-tagging">
+          Rack tagging & print ↓
+        </a>
+        <Tagging
+          key={job && finished.has(job.state) ? job.id + job.state : 'standalone'}
+          jobId={job && finished.has(job.state) ? job.id : undefined}
+          maxMb={session.limits.fileMb}
+        />
         <footer className="main-footer">
           <span>
             <Icon name="info" size={15} /> Use original, text-based Toyota PDFs. Scanned copies aren’t

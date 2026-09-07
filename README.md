@@ -2,7 +2,17 @@
 
 An internal Toyota order converter: upload PDF purchase orders, extract them with local Ollama through n8n, and download one combined kanban workbook per delivery date.
 
-The interface uses a compact Sugihara Grand Industries logo, Digital Transformation Unit branding, and the original green/teal palette with a subtle animated gradient. The header and desktop sidebar stay fixed while content scrolls. Animation respects reduced-motion preferences. PO numbers go in Remarks beside their trip: `SGIS12AA0747-SA` for Shah Alam and `SGIS13FA5002-BR` for Bukit Raja. Original order IDs are retained separately for source validation. Orders for the same delivery date share one Excel file, even across different PDFs. A PDF or batch containing two delivery dates produces two files, each with one daily sheet. Download them individually or together as a ZIP.
+The interface uses a compact Sugihara Grand Industries logo, Digital Transformation Unit branding, and a dark-blue palette with a subtle animated gradient. The header and desktop sidebar stay fixed while content scrolls. Animation respects reduced-motion preferences. PO numbers go in Remarks beside their trip: `SGIS12AA0747-SA` for Shah Alam and `SGIS13FA5002-BR` for Bukit Raja. Original order IDs are retained separately for source validation. Orders for the same delivery date share one Excel file, even across different PDFs. A PDF or batch containing two delivery dates produces two files, each with one daily sheet. Download them individually or together as a ZIP.
+
+## Rack tagging and Windows printing
+
+Choose **Rack tagging & print** in the sidebar and upload the tagging PDF. Small-tag pages default to one copy each. Each small tag represents one rack (repeated part tags count separately). The large page is identified by its ORDER NUMBER and SKID NO fields and matched by destination and delivery sequence. Its copies equal two per rack, except Bukit Raja `614` and Shah Alam `HU83`, `238X`, `HU82`, which need one per rack. Three HOOK racks therefore need three large-page copies. The supplied six-rack example produces two original small-tag sheets plus twelve large-page copies: fourteen printed pages.
+
+Convert the POs first to cross-check rack counts against validated orders in the current batch. When matched, the PO's ORDER (KANBANS) drives copies and the table compares PO racks with tags found. Standalone tagging uses the small-tag count and explicitly asks the user to verify it against the PO. Unknown pages, missing identifiers, duplicate rack covers, unknown parts, and count discrepancies display review notes. The user can select page types, edit copies, or set zero to exclude a page. They must confirm review before preparing the print packet; changing a count clears confirmation. Limits are 100 source pages, 500 copies per page and 1,000 output pages.
+
+**Choose printer & print** opens the browser print dialog on the user's Windows computer. Printer, colour and driver settings are chosen there; no Linux printer access or local print agent is required. Use A4 portrait, single-sided, Copies **1**, and disable browser headers/footers. Repeated pages are already present in the packet. Rendering preserves the source page proportions as high-resolution images. The app cannot confirm physical printer completion or silently enumerate Windows printers. No print is sent without confirmation in the browser dialog.
+
+Tagging PDFs are processed for review and kept in browser memory for preview/printing; they are not saved as job attachments. Refreshing requires uploading them again. Rebuild both API and web after pulling this feature.
 
 ![Toyota PO Converter interface](docs/frontend-preview.png)
 

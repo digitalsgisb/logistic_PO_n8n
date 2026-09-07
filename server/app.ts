@@ -13,6 +13,9 @@ import { config } from './config.ts';
 import { Store } from './store.ts';
 import { Engine, publicJob } from './engine.ts';
 import type { Job } from './types.ts';
+import { readPdf } from './pdf.ts';
+import { assemble } from './mapping.ts';
+import { analyseTagging } from './tagging.ts';
 const equal = (a: string, b: string) => {
   const aa = Buffer.from(a),
     bb = Buffer.from(b);
@@ -53,14 +56,12 @@ export async function buildApp(options = config) {
   app.setErrorHandler((error, req, reply) => {
     const e = error as Error & { statusCode?: number };
     req.log.error({ err: e }, 'Request failed');
-    reply
-      .code(e.statusCode ?? 500)
-      .send({
-        error:
-          e.statusCode && e.statusCode < 500
-            ? e.message
-            : 'Processing failed. Please retry or check the server logs.',
-      });
+    reply.code(e.statusCode ?? 500).send({
+      error:
+        e.statusCode && e.statusCode < 500
+          ? e.message
+          : 'Processing failed. Please retry or check the server logs.',
+    });
   });
   app.get('/health', () => ({ ok: true }));
   app.post(
@@ -168,6 +169,23 @@ export async function buildApp(options = config) {
     return job;
   };
   app.get<{ Params: { id: string } }>('/api/jobs/:id', (req) => publicJob(getJob(req.params.id)));
+  app.post<{ Querystring: { job?: string } }>('/api/tagging/review', async (req, reply) => {
+    const part = await req.file({ limits: { files: 1, fileSize: options.maxFileBytes } });
+    if (!part || !/\.pdf$/i.test(part.filename))
+      return reply.code(400).send({ error: 'Choose a tagging PDF.' });
+    const bytes = await part.toBuffer();
+    if (part.file.truncated || bytes.subarray(0, 5).toString() !== '%PDF-')
+      return reply.code(400).send({ error: 'Choose a valid PDF within the upload limit.' });
+    try {
+      const texts = await readPdf(bytes, 100);
+      const orders = req.query.job ? assemble(getJob(req.query.job).pages).orders : [];
+      return { pages: analyseTagging(texts, orders) };
+    } catch (error) {
+      return reply
+        .code(400)
+        .send({ error: error instanceof Error ? error.message : 'Cannot read tagging PDF.' });
+    }
+  });
   app.post<{ Params: { id: string } }>('/api/jobs/:id/retry', (req) =>
     publicJob(engine.retry(req.params.id)),
   );

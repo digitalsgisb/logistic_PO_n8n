@@ -4,6 +4,13 @@ Verified on 4 September 2026 with Node 24.12.0 on Windows.
 
 ## Completed checks
 
+### Rack-tagging review, Windows printing and dark-blue interface — 7 September 2026
+
+- All 22 automated tests and TypeScript/production build checks pass. Tests cover rack multipliers, repeated small tags, separate dates/destinations, ambiguous covers, PO discrepancies, and authenticated PDF review uploads.
+- Inspected the supplied three-page Toyota Tagging PDF with the existing PDF reader and rendered it in the browser. It contains six rack tags across two small-tag pages and one large rack page; the review and print packet contain 1 + 1 + 12 pages.
+- Edge browser checks used the real PDF: three source previews, disabled printing before review, explicit preparation, fourteen generated print pages, changing a count clears approval and the packet, mobile width 390 without overflow, and no page errors. Print-media rendering was inspected and contains only the original tag artwork. The print call was intercepted during testing; no physical print was sent or printer completion verified.
+- The new dark-blue palette retains motion preferences, fixed navigation, and company branding. Printer selection and settings are provided by the Windows browser print dialog. A local print agent and silent printing are not part of this implementation.
+
 ### Separate output files by delivery date
 
 - All 17 tests, TypeScript checking, and the production build passed. The API upload test covers a single PDF with four POs across two delivery dates, two separately downloadable Excel files containing only their respective orders, and a ZIP containing exactly those two files. The existing one-date PDF still produces one output, and restart/retry preserves successful quantities without duplication.
