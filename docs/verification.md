@@ -4,6 +4,12 @@ Verified on 4 September 2026 with Node 24.12.0 on Windows.
 
 ## Completed checks
 
+### Tagging worker loading and drag-and-drop — 7 September 2026
+
+- Vite now builds the PDF worker as a JavaScript worker asset with a `.js` extension. Nginx explicitly serves `.mjs` with a JavaScript MIME type, returns 404 for missing assets, and revalidates the app document after deployments.
+- TypeScript and the production build passed. Edge loaded the built assets from a local static server applying the production CSP and nosniff header: the worker returned JavaScript content, dropping the supplied PDF produced three previews and fourteen print pages, and invalid file rejection, drag highlight, confirmation and print-layout checks passed. The remote site's headers could not be inspected from this environment due to a TLS connection failure; the production-container fix addresses the module-serving issue identified in configuration.
+- Rebuild the web container and refresh the browser after pulling. No physical print was sent during verification.
+
 ### Rack-tagging review, Windows printing and dark-blue interface — 7 September 2026
 
 - All 22 automated tests and TypeScript/production build checks pass. Tests cover rack multipliers, repeated small tags, separate dates/destinations, ambiguous covers, PO discrepancies, and authenticated PDF review uploads.

@@ -69,6 +69,17 @@
 .tag-upload input {
   max-width: 100%;
 }
+.tag-upload {
+  transition:
+    background 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+.tag-upload-dragging {
+  background: #e4edfc;
+  border-color: #325f9d;
+  box-shadow: 0 0 0 3px #325f9d20;
+}
 .tag-summary {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

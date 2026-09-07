@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
-import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?worker&url';
 
 type Page = {
   page: number;
@@ -22,6 +22,8 @@ export function Tagging({ jobId, maxMb }: { jobId?: string; maxMb: number }) {
   const [approved, setApproved] = useState(false),
     [printImages, setPrintImages] = useState<string[]>([]);
   const [prepared, setPrepared] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const dragDepth = useRef(0);
   const document = useRef<PDFDocumentProxy | null>(null);
   const request = useRef(0);
   useEffect(
@@ -52,7 +54,7 @@ export function Tagging({ jobId, maxMb }: { jobId?: string; maxMb: number }) {
     return canvas.toDataURL('image/png');
   }
   async function upload(file?: File) {
-    if (!file) return;
+    if (!file || busy) return;
     setError('');
     setApproved(false);
     setPrepared(false);
@@ -91,7 +93,12 @@ export function Tagging({ jobId, maxMb }: { jobId?: string; maxMb: number }) {
       if (current === request.current) setPreviews(images);
     } catch (e) {
       if (current === request.current) {
-        setError((e as Error).message);
+        const message = (e as Error).message;
+        setError(
+          /worker|dynamically imported module/i.test(message)
+            ? 'The PDF preview could not load. Refresh this page and try again. If it continues, ask your administrator to update the web container.'
+            : message,
+        );
         setPages([]);
       }
     } finally {
@@ -154,11 +161,41 @@ export function Tagging({ jobId, maxMb }: { jobId?: string; maxMb: number }) {
         </div>
         <span className="xlsx-chip">PDF → PRINT</span>
       </div>
-      <label className="tag-upload">
+      <label
+        className={`tag-upload${dragging ? ' tag-upload-dragging' : ''}`}
+        onDragEnter={(e) => {
+          e.preventDefault();
+          if (!busy) {
+            dragDepth.current++;
+            setDragging(true);
+          }
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = busy ? 'none' : 'copy';
+        }}
+        onDragLeave={(e) => {
+          e.preventDefault();
+          dragDepth.current = Math.max(0, dragDepth.current - 1);
+          if (!dragDepth.current) setDragging(false);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          dragDepth.current = 0;
+          setDragging(false);
+          if (busy) return;
+          const incoming = Array.from(e.dataTransfer.files);
+          if (incoming.length !== 1) {
+            setError('Drop one tagging PDF at a time.');
+            return;
+          }
+          void upload(incoming[0]);
+        }}
+      >
         {' '}
-        <strong>{name || 'Upload rack-tagging PDF'}</strong>
+        <strong>{dragging ? 'Drop your tagging PDF here' : name || 'Drop your rack-tagging PDF here'}</strong>
         <span>
-          {name ? 'Replace PDF' : 'Choose PDF'} · up to {maxMb} MB
+          {name ? 'Drop a PDF to replace, or browse' : 'or browse files'} · up to {maxMb} MB
         </span>
         <input
           aria-label="Upload rack-tagging PDF"
@@ -167,6 +204,7 @@ export function Tagging({ jobId, maxMb }: { jobId?: string; maxMb: number }) {
           disabled={!!busy}
           onChange={(e) => {
             void upload(e.target.files?.[0]);
+            e.target.value = '';
           }}
         />
       </label>
