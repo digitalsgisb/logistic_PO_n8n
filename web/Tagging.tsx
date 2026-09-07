@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { ExcelDownload } from './ExcelDownload';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?worker&url';
 
@@ -294,9 +295,7 @@ export function Tagging({
                   {workbooks
                     .filter((w) => w.date === date)
                     .map((w) => (
-                      <a className="daily-download" href={w.href} key={w.id}>
-                        Download Excel · {w.order_count} {w.order_count === 1 ? 'order' : 'orders'} ↓
-                      </a>
+                      <ExcelDownload href={w.href} key={w.id} date={w.date} orders={w.order_count} />
                     ))}
                 </header>
                 {[

@@ -4,6 +4,11 @@ Verified on 4 September 2026 with Node 24.12.0 on Windows.
 
 ## Completed checks
 
+### Clear Excel downloads and smoother motion — 7 September 2026
+
+- Added a shared green Excel download button with a spreadsheet icon, explicit action label, date/order context and separate ZIP wording. Added gentle section entry, hover transitions and progressive details-height animation, with reduced-motion overrides.
+- TypeScript and the production build passed. The browser workflow checks passed for combined, PO-only and tagging-only tasks, date download links, expandable review, printing isolation and mobile width. The green button was visually inspected in the grouped review.
+
 ### Guided dispatch workspace — 7 September 2026
 
 - Consolidated uploads into one step with PO + tagging, PO-only and tagging-only modes. Tagging selected up front is reviewed after the PO batch reaches a terminal state. Date-specific workbooks and tagging pages are grouped in the review, with expandable pages and automatically opened warnings. Print confirmation and existing PDF compatibility handling remain in place.

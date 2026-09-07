@@ -163,6 +163,96 @@
   font-size: 13px;
   color: #123965;
 }
+.excel-download {
+  background: #107c41;
+  border-color: #107c41;
+  color: #fff;
+  min-height: 62px;
+  padding: 12px 18px;
+  gap: 14px;
+  box-shadow: 0 3px 10px #107c4118;
+  transition:
+    background 200ms ease,
+    box-shadow 200ms ease,
+    transform 200ms ease;
+}
+.excel-download:hover {
+  background: #0b6534;
+  border-color: #0b6534;
+  box-shadow: 0 5px 16px #107c4130;
+  transform: translateY(-1px);
+}
+.excel-download:active {
+  transform: translateY(0);
+}
+.excel-download-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.excel-download-copy strong {
+  font-size: 15px;
+  font-weight: 650;
+}
+.excel-download-copy small {
+  font-size: 12px;
+  color: #e1f5e9;
+}
+.excel-download-arrow {
+  margin-left: auto;
+}
+.workflow-upload,
+.workflow-review,
+.tagging-panel {
+  animation: workflow-arrive 320ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.tag-page-details[open] .tag-card {
+  animation: workflow-arrive 260ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.tag-page-details > summary {
+  transition: background 180ms ease;
+}
+.tag-page-details > summary:hover {
+  background: #f1f5fb;
+}
+.workflow-modes button,
+.workflow-progress b {
+  transition:
+    background 220ms ease,
+    color 220ms ease,
+    border-color 220ms ease;
+}
+@keyframes workflow-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@supports (interpolate-size: allow-keywords) {
+  .workflow-upload,
+  .tag-page-details {
+    interpolate-size: allow-keywords;
+  }
+  .workflow-upload::details-content,
+  .tag-page-details::details-content {
+    block-size: 0;
+    opacity: 0;
+    overflow: clip;
+    transition:
+      block-size 300ms cubic-bezier(0.2, 0.7, 0.2, 1),
+      opacity 220ms ease,
+      content-visibility 300ms allow-discrete;
+  }
+  .workflow-upload[open]::details-content,
+  .tag-page-details[open]::details-content {
+    block-size: auto;
+    opacity: 1;
+  }
+}
 .dispatch-date > header {
   display: flex;
   justify-content: space-between;
@@ -1673,6 +1763,10 @@ h3 {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .workflow-upload::details-content,
+  .tag-page-details::details-content {
+    transition: none !important;
+  }
   :root {
     scroll-behavior: auto;
   }

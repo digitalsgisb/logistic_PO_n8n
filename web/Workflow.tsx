@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Tagging } from './Tagging';
+import { ExcelDownload } from './ExcelDownload';
 type Result = {
   id: string;
   status: string;
@@ -248,9 +249,7 @@ export function Workflow({
       <section className="workflow-review" id="workflow-review">
         <h2>2. Review your dispatch</h2>
         {ready.length > 1 && (
-          <a className="daily-download" href={`/api/jobs/${job!.id}/download-all`}>
-            Download all {ready.length} workbooks (ZIP) ↓
-          </a>
+          <ExcelDownload href={`/api/jobs/${job!.id}/download-all`} files={ready.length} />
         )}
         {!active ? (
           <p>Your daily workbooks and rack quantities will appear here.</p>
@@ -277,10 +276,7 @@ export function Workflow({
           <>
             <div className="workflow-workbooks">
               {workbooks.map((r) => (
-                <a className="daily-download" href={r.href} key={r.id}>
-                  <strong>{r.date?.split('-').reverse().join('/')}</strong>
-                  <span>{r.order_count} orders · Download Excel ↓</span>
-                </a>
+                <ExcelDownload href={r.href} key={r.id} date={r.date} orders={r.order_count} />
               ))}
             </div>
             <p>Your Excel files are ready.</p>
