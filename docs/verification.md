@@ -4,6 +4,11 @@ Verified on 4 September 2026 with Node 24.12.0 on Windows.
 
 ## Completed checks
 
+### Guided dispatch workspace — 7 September 2026
+
+- Consolidated uploads into one step with PO + tagging, PO-only and tagging-only modes. Tagging selected up front is reviewed after the PO batch reaches a terminal state. Date-specific workbooks and tagging pages are grouped in the review, with expandable pages and automatically opened warnings. Print confirmation and existing PDF compatibility handling remain in place.
+- All 22 automated tests, TypeScript and the production build passed. Edge checks exercised all three modes, combined processing order, collapsed clean pages, expanded warnings, date downloads, fourteen-page print preparation, copy-edit invalidation, print-only content, and a 390-pixel viewport without overflow. The UI check used simulated PO completion and the supplied tagging PDF through the real review API, with matching status supplied by the test. It did not run a new n8n extraction or send a physical print.
+
 ### Browser compatibility for PDF preview — 7 September 2026
 
 - Switched both the PDF viewer and worker to the matching PDF.js legacy builds, which provide compatibility implementations for Map/WeakMap getOrInsert and getOrInsertComputed.

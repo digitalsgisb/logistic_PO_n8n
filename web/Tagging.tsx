@@ -13,7 +13,21 @@ type Page = {
   matchedOrders: string[];
 };
 
-export function Tagging({ jobId, maxMb }: { jobId?: string; maxMb: number }) {
+export function Tagging({
+  jobId,
+  maxMb,
+  sourceFile,
+  guided = false,
+  workbooks = [],
+  onStage,
+}: {
+  jobId?: string;
+  maxMb: number;
+  sourceFile?: File;
+  guided?: boolean;
+  workbooks?: { id: string; date?: string; href: string; order_count?: number }[];
+  onStage?: (step: number) => void;
+}) {
   const [pages, setPages] = useState<Page[]>([]),
     [previews, setPreviews] = useState<string[]>([]);
   const [name, setName] = useState(''),
@@ -26,6 +40,16 @@ export function Tagging({ jobId, maxMb }: { jobId?: string; maxMb: number }) {
   const dragDepth = useRef(0);
   const document = useRef<PDFDocumentProxy | null>(null);
   const request = useRef(0);
+  const sourceVersion = useRef<File | undefined>(undefined);
+  useEffect(() => {
+    if (sourceFile && sourceVersion.current !== sourceFile && !busy) {
+      const timer = setTimeout(() => {
+        sourceVersion.current = sourceFile;
+        void upload(sourceFile);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [sourceFile, busy]);
   useEffect(
     () => () => {
       request.current++;
@@ -87,6 +111,7 @@ export function Tagging({ jobId, maxMb }: { jobId?: string; maxMb: number }) {
         return;
       }
       document.current = pdf;
+      onStage?.(2);
       setPages(result.pages);
       const images = [];
       for (let n = 1; n <= pdf.numPages; n++) images.push(await render(pdf, n, 0.65));
@@ -114,6 +139,7 @@ export function Tagging({ jobId, maxMb }: { jobId?: string; maxMb: number }) {
     total > 0 &&
     total <= 1000;
   function update(index: number, change: Partial<Page>) {
+    onStage?.(2);
     setPages((old) => old.map((p, i) => (i === index ? { ...p, ...change } : p)));
     setApproved(false);
     setPrepared(false);
@@ -129,6 +155,7 @@ export function Tagging({ jobId, maxMb }: { jobId?: string; maxMb: number }) {
         images.push(page.copies ? await render(document.current, page.page, 2.5) : '');
       setPrintImages(images);
       setPrepared(true);
+      onStage?.(3);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -151,73 +178,93 @@ export function Tagging({ jobId, maxMb }: { jobId?: string; maxMb: number }) {
       setError('Print preview could not open. Please try again.');
     }
   }
+  const dateOf = (p: Page) =>
+    p.sequence
+      ? p.sequence.slice(0, 4) + '-' + p.sequence.slice(4, 6) + '-' + p.sequence.slice(6, 8)
+      : 'Unmatched date';
+  const dates = [
+    ...new Set([...pages.map(dateOf), ...workbooks.map((w) => w.date ?? 'Unmatched date')]),
+  ].sort();
   return (
     <section className="tagging-panel" id="rack-tagging">
-      <div className="tag-heading">
-        <div>
-          <div className="eyebrow teal">RACK TAGGING</div>
-          <h2>Review. Confirm. Print.</h2>
-          <p>Small-tag pages print once. Large rack pages use the copies calculated below.</p>
+      {!guided && (
+        <div className="tag-heading">
+          <div>
+            <div className="eyebrow teal">RACK TAGGING</div>
+            <h2>Review. Confirm. Print.</h2>
+            <p>Small-tag pages print once. Large rack pages use the copies calculated below.</p>
+          </div>
+          <span className="xlsx-chip">PDF → PRINT</span>
         </div>
-        <span className="xlsx-chip">PDF → PRINT</span>
-      </div>
-      <label
-        className={`tag-upload${dragging ? ' tag-upload-dragging' : ''}`}
-        onDragEnter={(e) => {
-          e.preventDefault();
-          if (!busy) {
-            dragDepth.current++;
-            setDragging(true);
-          }
-        }}
-        onDragOver={(e) => {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = busy ? 'none' : 'copy';
-        }}
-        onDragLeave={(e) => {
-          e.preventDefault();
-          dragDepth.current = Math.max(0, dragDepth.current - 1);
-          if (!dragDepth.current) setDragging(false);
-        }}
-        onDrop={(e) => {
-          e.preventDefault();
-          dragDepth.current = 0;
-          setDragging(false);
-          if (busy) return;
-          const incoming = Array.from(e.dataTransfer.files);
-          if (incoming.length !== 1) {
-            setError('Drop one tagging PDF at a time.');
-            return;
-          }
-          void upload(incoming[0]);
-        }}
-      >
-        {' '}
-        <strong>{dragging ? 'Drop your tagging PDF here' : name || 'Drop your rack-tagging PDF here'}</strong>
-        <span>
-          {name ? 'Drop a PDF to replace, or browse' : 'or browse files'} · up to {maxMb} MB
-        </span>
-        <input
-          aria-label="Upload rack-tagging PDF"
-          type="file"
-          accept=".pdf,application/pdf"
-          disabled={!!busy}
-          onChange={(e) => {
-            void upload(e.target.files?.[0]);
-            e.target.value = '';
-          }}
-        />
-      </label>
-      <p className="tag-hint">
-        {jobId
-          ? 'Matching tags against the validated POs in this batch.'
-          : 'You can prepare tags separately. Upload and convert POs first to cross-check rack quantities.'}
-      </p>
+      )}
+      {!guided && (
+        <>
+          <label
+            className={`tag-upload${dragging ? ' tag-upload-dragging' : ''}`}
+            onDragEnter={(e) => {
+              e.preventDefault();
+              if (!busy) {
+                dragDepth.current++;
+                setDragging(true);
+              }
+            }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = busy ? 'none' : 'copy';
+            }}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              dragDepth.current = Math.max(0, dragDepth.current - 1);
+              if (!dragDepth.current) setDragging(false);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              dragDepth.current = 0;
+              setDragging(false);
+              if (busy) return;
+              const incoming = Array.from(e.dataTransfer.files);
+              if (incoming.length !== 1) {
+                setError('Drop one tagging PDF at a time.');
+                return;
+              }
+              void upload(incoming[0]);
+            }}
+          >
+            {' '}
+            <strong>
+              {dragging ? 'Drop your tagging PDF here' : name || 'Drop your rack-tagging PDF here'}
+            </strong>
+            <span>
+              {name ? 'Drop a PDF to replace, or browse' : 'or browse files'} · up to {maxMb} MB
+            </span>
+            <input
+              aria-label="Upload rack-tagging PDF"
+              type="file"
+              accept=".pdf,application/pdf"
+              disabled={!!busy}
+              onChange={(e) => {
+                void upload(e.target.files?.[0]);
+                e.target.value = '';
+              }}
+            />
+          </label>
+          <p className="tag-hint">
+            {jobId
+              ? 'Matching tags against the validated POs in this batch.'
+              : 'You can prepare tags separately. Upload and convert POs first to cross-check rack quantities.'}
+          </p>
+        </>
+      )}
       {busy && <p role="status">{busy}</p>}
       {error && (
-        <p className="error" role="alert">
+        <div className="error" role="alert">
           {error}
-        </p>
+          {guided && sourceFile && (
+            <button className="outline" disabled={!!busy} onClick={() => void upload(sourceFile)}>
+              Retry tagging preview
+            </button>
+          )}
+        </div>
       )}
       {!!pages.length && (
         <>
@@ -240,95 +287,152 @@ export function Tagging({ jobId, maxMb }: { jobId?: string; maxMb: number }) {
             </div>
           </div>
           <div className="tag-pages">
-            {pages.map((p, i) => (
-              <article className="tag-card" key={p.page}>
-                <div className="tag-preview">
-                  {previews[i] ? (
-                    <img src={previews[i]} alt={`Source tagging page ${p.page}`} />
-                  ) : (
-                    <span>Loading preview…</span>
-                  )}
-                </div>
-                <div className="tag-card-body">
-                  <h3>
-                    Page {p.page}{' '}
-                    <span>
-                      {p.kind === 'rack' ? 'Rack cover' : p.kind === 'small' ? 'Small tags' : 'Needs review'}
-                    </span>
-                  </h3>
-                  <p>
-                    {p.place || 'Check destination'} ·{' '}
-                    {p.sequence
-                      ? `${p.sequence.slice(6, 8)}/${p.sequence.slice(4, 6)}/${p.sequence.slice(0, 4)} · Trip ${Number(p.sequence.slice(-2))}`
-                      : 'Check date / trip'}
-                  </p>
-                  {!!p.lines.length && (
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Part</th>
-                          <th>{p.matchedOrders.length ? 'PO racks' : 'Racks'}</th>
-                          {!!p.matchedOrders.length && <th>Tags found</th>}
-                          <th>Tags/rack</th>
-                          <th>Copies</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {p.lines.map((l) => (
-                          <tr key={l.code}>
-                            <td>{l.code}</td>
-                            <td>{l.racks}</td>
-                            {!!p.matchedOrders.length && <td>{l.tagRacks}</td>}
-                            <td>{l.multiplier}</td>
-                            <td>{l.copies}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                  {!!p.matchedOrders.length && (
-                    <p className="tag-match">Matched: {p.matchedOrders.join(', ')}</p>
-                  )}
-                  {p.notes.map((note) => (
-                    <p className="tag-warning" key={note}>
-                      {note}
-                    </p>
-                  ))}
-                  <div className="tag-controls">
-                    <label>
-                      Page type
-                      <select
-                        value={p.kind}
-                        disabled={!!busy}
-                        onChange={(e) => update(i, { kind: e.target.value })}
-                      >
-                        <option value="unknown">Select type</option>
-                        <option value="small">Small tags</option>
-                        <option value="rack">Large rack page</option>
-                      </select>
-                    </label>
-                    <label>
-                      Copies
-                      <input
-                        aria-label={`Copies for page ${p.page}`}
-                        type="number"
-                        min="0"
-                        max="500"
-                        value={p.copies}
-                        disabled={!!busy}
-                        onChange={(e) =>
-                          update(i, { copies: e.target.value === '' ? 0 : Number(e.target.value) })
-                        }
-                      />
-                    </label>
-                  </div>
-                  <small>Set 0 to exclude a page. Verify changes against the PO.</small>
-                </div>
-              </article>
+            {dates.map((date) => (
+              <section className="dispatch-date" key={date}>
+                <header>
+                  <h3>{date.includes('-') ? date.split('-').reverse().join('/') : date}</h3>
+                  {workbooks
+                    .filter((w) => w.date === date)
+                    .map((w) => (
+                      <a className="daily-download" href={w.href} key={w.id}>
+                        Download Excel · {w.order_count} {w.order_count === 1 ? 'order' : 'orders'} ↓
+                      </a>
+                    ))}
+                </header>
+                {[
+                  ...new Set(
+                    pages
+                      .filter((p) => dateOf(p) === date)
+                      .map((p) => p.place + ' · Trip ' + Number(p.sequence.slice(-2))),
+                  ),
+                ].map((group) => (
+                  <section className="dispatch-group" key={group}>
+                    <h4>{group}</h4>
+                    {pages
+                      .map((p, i) => ({ p, i }))
+                      .filter(
+                        ({ p }) =>
+                          dateOf(p) === date && p.place + ' · Trip ' + Number(p.sequence.slice(-2)) === group,
+                      )
+                      .map(({ p, i }) => (
+                        <details
+                          className="tag-page-details"
+                          key={p.page}
+                          open={p.notes.length > 0 || p.kind === 'unknown'}
+                        >
+                          <summary>
+                            Page {p.page} · {p.kind === 'rack' ? 'Rack cover' : 'Small tags'}
+                            <span>
+                              {p.copies} {p.copies === 1 ? 'copy' : 'copies'} ·{' '}
+                              {p.notes.length ? 'Needs attention' : 'View page & quantities'}
+                            </span>
+                          </summary>
+                          <article className="tag-card">
+                            <div className="tag-preview">
+                              {previews[i] ? (
+                                <img src={previews[i]} alt={`Source tagging page ${p.page}`} />
+                              ) : (
+                                <span>Loading preview…</span>
+                              )}
+                            </div>
+                            <div className="tag-card-body">
+                              <h3>
+                                Page {p.page}{' '}
+                                <span>
+                                  {p.kind === 'rack'
+                                    ? 'Rack cover'
+                                    : p.kind === 'small'
+                                      ? 'Small tags'
+                                      : 'Needs review'}
+                                </span>
+                              </h3>
+                              <p>
+                                {p.place || 'Check destination'} ·{' '}
+                                {p.sequence
+                                  ? `${p.sequence.slice(6, 8)}/${p.sequence.slice(4, 6)}/${p.sequence.slice(0, 4)} · Trip ${Number(p.sequence.slice(-2))}`
+                                  : 'Check date / trip'}
+                              </p>
+                              {!!p.lines.length && (
+                                <table>
+                                  <thead>
+                                    <tr>
+                                      <th>Part</th>
+                                      <th>{p.matchedOrders.length ? 'PO racks' : 'Racks'}</th>
+                                      {!!p.matchedOrders.length && <th>Tags found</th>}
+                                      <th>Tags/rack</th>
+                                      <th>Copies</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {p.lines.map((l) => (
+                                      <tr key={l.code}>
+                                        <td>{l.code}</td>
+                                        <td>{l.racks}</td>
+                                        {!!p.matchedOrders.length && <td>{l.tagRacks}</td>}
+                                        <td>{l.multiplier}</td>
+                                        <td>{l.copies}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              )}
+                              {!!p.matchedOrders.length && (
+                                <p className="tag-match">Matched: {p.matchedOrders.join(', ')}</p>
+                              )}
+                              {p.notes.map((note) => (
+                                <p className="tag-warning" key={note}>
+                                  {note}
+                                </p>
+                              ))}
+                              <div className="tag-controls">
+                                <label>
+                                  Page type
+                                  <select
+                                    value={p.kind}
+                                    disabled={!!busy}
+                                    onChange={(e) => update(i, { kind: e.target.value })}
+                                  >
+                                    <option value="unknown">Select type</option>
+                                    <option value="small">Small tags</option>
+                                    <option value="rack">Large rack page</option>
+                                  </select>
+                                </label>
+                                <label>
+                                  Copies
+                                  <input
+                                    aria-label={`Copies for page ${p.page}`}
+                                    type="number"
+                                    min="0"
+                                    max="500"
+                                    value={p.copies}
+                                    disabled={!!busy}
+                                    onChange={(e) =>
+                                      update(i, {
+                                        copies: e.target.value === '' ? 0 : Number(e.target.value),
+                                      })
+                                    }
+                                  />
+                                </label>
+                              </div>
+                              <small>Set 0 to exclude a page. Verify changes against the PO.</small>
+                            </div>
+                          </article>
+                        </details>
+                      ))}
+                  </section>
+                ))}
+              </section>
             ))}
           </div>
-          <div className="tag-confirm">
-            <h3>Print with your Windows printer</h3>
+          <div className="tag-confirm" id="tag-print-review">
+            <h3>3. Confirm & print</h3>
+            <p>
+              <strong>
+                {pages.filter((p) => p.kind === 'small').reduce((n, p) => n + p.copies, 0)} small-tag pages +{' '}
+                {pages.filter((p) => p.kind === 'rack').reduce((n, p) => n + p.copies, 0)} rack copies ={' '}
+                {total} printed pages
+              </strong>
+            </p>
             <p>
               Next, choose your printer, paper size, colour and other settings in the browser print dialog.
               Use <strong>Copies: 1</strong>, <strong>single-sided</strong>, and turn off headers and
@@ -341,6 +445,7 @@ export function Tagging({ jobId, maxMb }: { jobId?: string; maxMb: number }) {
                 disabled={!!busy || !valid}
                 onChange={(e) => {
                   setApproved(e.target.checked);
+                  onStage?.(2);
                   setPrepared(false);
                 }}
               />

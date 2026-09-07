@@ -1,8 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './style.css';
 import companyLogo from './assets/sugihara-logo.png';
-import { Tagging } from './Tagging';
+import { Workflow } from './Workflow';
 
 function CompanyLogo() {
   return <img className="company-logo" src={companyLogo} alt="Sugihara Grand Industries Sdn Bhd" />;
@@ -113,12 +113,10 @@ function App() {
     [job, setJob] = useState<Job | null>(null),
     [error, setError] = useState(''),
     [upload, setUpload] = useState<number | null>(null),
-    [drag, setDrag] = useState(false),
     [password, setPassword] = useState(''),
     [username, setUsername] = useState('pilot'),
     [loginBusy, setLoginBusy] = useState(false),
     [retryBusy, setRetryBusy] = useState(false);
-  const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
     api('/api/session')
       .then(setSession)
@@ -224,8 +222,6 @@ function App() {
     };
     xhr.send(form);
   };
-  const ready = job?.results.filter((r) => r.status === 'ready') ?? [],
-    review = job?.results.filter((r) => r.status === 'review') ?? [];
   const restart = () => {
     setJob(null);
     setFiles([]);
@@ -306,7 +302,7 @@ function App() {
         <nav className="header-context" aria-label="Breadcrumb">
           <span>Operations</span>
           <Icon name="arrow" size={15} />
-          <strong>PO Converter</strong>
+          <strong>Daily dispatch</strong>
         </nav>
         <div className="top-right">
           <span className="private-label">{session.username}</span>
@@ -335,14 +331,14 @@ function App() {
           </span>
         </a>
         <p className="nav-label">WORKSPACE</p>
-        <a className="nav-active" href="#po-converter">
+        <a className="nav-active" href="#workflow-upload">
           <Icon name="grid" />
-          <span>PO Converter</span>
+          <span>Daily dispatch</span>
           <span className="nav-dot" />
         </a>
-        <a className="nav-active tag-nav" href="#rack-tagging">
+        <a className="nav-active tag-nav" href="#workflow-review">
           <Icon name="file" />
-          <span>Rack tagging & print</span>
+          <span>Review & print</span>
         </a>
         <div className="sidebar-note">
           <div className="side-rule" />
@@ -366,279 +362,27 @@ function App() {
         </div>
       </aside>
       <main>
-        <div className="page-heading" id="po-converter">
-          <div>
-            <div className="eyebrow teal">PURCHASE ORDERS, SIMPLIFIED</div>
-            <h1>Toyota PO Converter</h1>
-            <p>Upload your orders. Download one kanban workbook per delivery date.</p>
-          </div>
-          <span className="pilot-pill">
-            TOYOTA <span>PILOT</span>
-          </span>
-        </div>
-        <div className="steps">
-          <span className={`step ${!job ? 'current' : 'complete'}`} aria-current={!job ? 'step' : undefined}>
-            <b>01</b> Upload PDFs
-          </span>
-          <span className="step-line" />
-          <span
-            className={`step ${job && !finished.has(job.state) ? 'current' : ready.length ? 'complete' : ''}`}
-            aria-current={job && !finished.has(job.state) ? 'step' : undefined}
-          >
-            <b>02</b> Convert orders
-          </span>
-          <span className="step-line" />
-          <span
-            className={`step ${!busy && ready.length ? 'current' : ''}`}
-            aria-current={!busy && ready.length ? 'step' : undefined}
-          >
-            <b>03</b> Download workbooks
-          </span>
-        </div>
-        {error && (
-          <div className="error global-error" role="alert">
-            {error}
-          </div>
-        )}
-        <div className="converter">
-          <section className="panel">
-            <div className="panel-heading">
-              <span className="panel-number">01</span>
-              <h2>Your purchase orders</h2>
-              <span className="file-count">
-                {job ? job.files.length : files.length}{' '}
-                {(job ? job.files.length : files.length) === 1 ? 'file' : 'files'}
-              </span>
-            </div>
-            <div
-              className={'dropzone corner-frame ' + (drag ? 'dragging ' : '') + (job ? 'uploaded' : '')}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDrag(true);
-              }}
-              onDragLeave={() => setDrag(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDrag(false);
-                add(Array.from(e.dataTransfer.files));
-              }}
-            >
-              <div className="upload-icon">
-                <Icon name={job ? 'check' : 'upload'} size={32} />
-              </div>
-              <h3>{job ? 'Your files are uploaded' : 'Drop your PDFs here'}</h3>
-              <p>
-                {job
-                  ? 'Orders for the same date go into one workbook.'
-                  : 'or choose files from your computer'}
-              </p>
-              {!job && (
-                <button className="outline" disabled={busy} onClick={() => input.current?.click()}>
-                  Browse files
-                </button>
-              )}
-              <input
-                ref={input}
-                type="file"
-                accept=".pdf,application/pdf"
-                multiple
-                hidden
-                onChange={(e) => {
-                  add(Array.from(e.target.files ?? []));
-                  e.target.value = '';
-                }}
-              />
-              <small>
-                PDF only · Up to {session.limits.files} files · {session.limits.fileMb} MB per file
-              </small>
-            </div>
-            <div className="file-list">
-              {(job ? job.files : files).map((f, i) => (
-                <div className="file-row" key={i}>
-                  <span className="pdf-icon">
-                    <Icon name="file" size={20} />
-                  </span>
-                  <div className="file-info">
-                    <strong title={'filename' in f ? f.filename : f.name}>
-                      {'filename' in f ? f.filename : f.name}
-                    </strong>
-                    <small>
-                      {Math.max(1, Math.round(f.size / 1024))} KB
-                      {'duplicate' in f && f.duplicate ? ' · Duplicate skipped' : ''}
-                    </small>
-                  </div>
-                  {!job && (
-                    <button
-                      aria-label={`Remove ${(f as File).name}`}
-                      className="remove"
-                      onClick={() => setFiles(files.filter((_, n) => n !== i))}
-                    >
-                      ×
-                    </button>
-                  )}
-                  {job && <Icon name="check" size={17} />}
-                </div>
-              ))}
-            </div>
-            {!job ? (
-              <button className="primary submit" disabled={!files.length || busy} onClick={submit}>
-                {upload !== null ? `Uploading ${upload}%` : 'Submit for conversion'}
-                <Icon name="arrow" size={19} />
-              </button>
-            ) : (
-              <button className="outline full" disabled={busy} onClick={restart}>
-                Start new batch
-              </button>
-            )}
-            <div className="panel-foot">
-              <Icon name="file" size={15} />
-              <span>Original documents stay unchanged.</span>
-            </div>
-          </section>
-          <div className="flow-arrow">
-            <Icon name="arrow" size={30} />
-          </div>
-          <section className="panel output-panel">
-            <div className="panel-heading">
-              <span className="panel-number">02</span>
-              <h2>Your daily workbooks</h2>
-              <span className="file-count">{ready.length} ready</span>
-            </div>
-            {!job || (!finished.has(job.state) && !job.results.length) ? (
-              <div className="output-placeholder corner-frame">
-                <div className={'output-icon ' + (busy ? 'processing' : '')}>
-                  <Icon name={busy ? 'grid' : 'file'} size={36} />
-                </div>
-                <h3>{busy ? 'Preparing your daily workbooks' : 'Ready when you are'}</h3>
-                <p>
-                  {busy
-                    ? 'We’re reading and checking each order.'
-                    : 'Your Excel files will appear here, one per delivery date.'}
-                </p>
-                <span className="xlsx-chip">XLSX</span>
-              </div>
-            ) : (
-              <div className="results" aria-live="polite">
-                {job.results.map((r) => (
-                  <div className={'result ' + r.status} key={r.id}>
-                    <span className="result-icon">
-                      <Icon name={r.status === 'ready' ? 'file' : 'info'} />
-                    </span>
-                    <div className="result-info">
-                      <strong>
-                        {r.order_count
-                          ? `Toyota orders · ${r.date?.split('-').reverse().join('/') ?? 'Workbook'}`
-                          : (r.kb_number ?? r.order_id)}
-                      </strong>
-                      {r.status === 'ready' ? (
-                        <small>
-                          {r.order_count ? `${r.order_count} orders · ` : ''}
-                          {(r.dates ?? (r.date ? [r.date] : []))
-                            .map((date) => date.split('-').reverse().join('/'))
-                            .join(', ')}
-                        </small>
-                      ) : (
-                        <p>{r.error}</p>
-                      )}
-                      <details className="source-details">
-                        <summary>
-                          {r.order_numbers ? 'View included POs and source pages' : 'View source pages'}
-                        </summary>
-                        {r.order_numbers && <p className="order-numbers">{r.order_numbers.join(', ')}</p>}
-                        <ul>
-                          {r.sources.map((source) => (
-                            <li key={source}>{source}</li>
-                          ))}
-                        </ul>
-                      </details>
-                    </div>
-                    {r.status === 'ready' && (
-                      <a
-                        className="download-one"
-                        href={`/api/jobs/${job.id}/outputs/${r.id}`}
-                        aria-label={`Download ${r.order_count ? `workbook for ${r.date ?? 'these orders'}` : (r.kb_number ?? r.order_id)}`}
-                      >
-                        <Icon name="download" size={20} />
-                      </a>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-            {(busy || job) && (
-              <div className="progress-area" aria-live="polite">
-                <div>
-                  <strong>{upload !== null ? 'Uploading documents' : job?.stage}</strong>
-                  <span>{upload !== null ? upload : job?.progress}%</span>
-                </div>
-                <div
-                  className="progress-track"
-                  role="progressbar"
-                  aria-valuenow={upload ?? job?.progress ?? 0}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-label="Conversion progress"
-                >
-                  <span style={{ width: `${upload ?? job?.progress ?? 0}%` }} />
-                </div>
-                {job?.error && <p className="processing-error">{job.error}</p>}
-              </div>
-            )}
-            {ready.length === 1 && (
-              <a className="primary download-all" href={`/api/jobs/${job!.id}/outputs/${ready[0].id}`}>
-                <Icon name="download" size={18} />
-                {job?.state === 'partial' ? 'Download workbook (valid orders)' : 'Download Excel workbook'}
-              </a>
-            )}
-            {ready.length > 1 && (
-              <a className="primary download-all" href={`/api/jobs/${job!.id}/download-all`}>
-                <Icon name="download" size={18} />
-                Download all ZIP <span>{ready.length}</span>
-              </a>
-            )}
-            {job && ['partial', 'failed', 'interrupted'].includes(job.state) && (
-              <button
-                className="outline full"
-                disabled={retryBusy}
-                onClick={async () => {
-                  setRetryBusy(true);
-                  try {
-                    setJob(await api(`/api/jobs/${job.id}/retry`, 'POST'));
-                    setError('');
-                  } catch (e) {
-                    setError((e as Error).message);
-                  } finally {
-                    setRetryBusy(false);
-                  }
-                }}
-              >
-                {retryBusy ? 'Queuing…' : 'Retry unsuccessful orders'}
-              </button>
-            )}
-            <div className="panel-foot">
-              <Icon name="check" size={15} />
-              <span>One workbook per delivery date · PO numbers in Remarks</span>
-            </div>
-          </section>
-        </div>
-        <a className="tag-mobile-link" href="#rack-tagging">
-          Rack tagging & print ↓
-        </a>
-        <Tagging
-          key={job && finished.has(job.state) ? job.id + job.state : 'standalone'}
-          jobId={job && finished.has(job.state) ? job.id : undefined}
+        <Workflow
+          files={files}
+          job={job}
+          busy={busy || retryBusy}
+          error={error}
+          add={add}
+          remove={(i) => setFiles(files.filter((_, n) => n !== i))}
+          submit={submit}
+          restart={restart}
           maxMb={session.limits.fileMb}
+          retry={async () => {
+            setRetryBusy(true);
+            try {
+              setJob(await api('/api/jobs/' + job!.id + '/retry', 'POST'));
+            } catch (e) {
+              setError((e as Error).message);
+            } finally {
+              setRetryBusy(false);
+            }
+          }}
         />
-        <footer className="main-footer">
-          <span>
-            <Icon name="info" size={15} /> Use original, text-based Toyota PDFs. Scanned copies aren’t
-            supported yet.
-          </span>
-          <span>Files available for 7 days</span>
-        </footer>
-        <div className="mobile-unit-mark">
-          <UnitMark />
-        </div>
       </main>
     </div>
   );
