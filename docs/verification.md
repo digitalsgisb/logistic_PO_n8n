@@ -4,6 +4,11 @@ Verified on 4 September 2026 with Node 24.12.0 on Windows.
 
 ## Completed checks
 
+### Browser compatibility for PDF preview — 7 September 2026
+
+- Switched both the PDF viewer and worker to the matching PDF.js legacy builds, which provide compatibility implementations for Map/WeakMap getOrInsert and getOrInsertComputed.
+- TypeScript and the production build passed. The production-browser test explicitly removed these native methods from both the page and worker before loading the viewer. The supplied PDF still rendered three previews and fourteen print pages; drag-and-drop, review confirmation, copy edits, mobile layout, and print isolation passed with no page errors. No physical print was sent.
+
 ### Tagging worker loading and drag-and-drop — 7 September 2026
 
 - Vite now builds the PDF worker as a JavaScript worker asset with a `.js` extension. Nginx explicitly serves `.mjs` with a JavaScript MIME type, returns 404 for missing assets, and revalidates the app document after deployments.

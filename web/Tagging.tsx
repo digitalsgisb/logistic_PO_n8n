@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
-import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?worker&url';
+import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?worker&url';
 
 type Page = {
   page: number;
@@ -79,7 +79,7 @@ export function Tagging({ jobId, maxMb }: { jobId?: string; maxMb: number }) {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error);
       await document.current?.loadingTask.destroy();
-      const { getDocument, GlobalWorkerOptions } = await import('pdfjs-dist');
+      const { getDocument, GlobalWorkerOptions } = await import('pdfjs-dist/legacy/build/pdf.mjs');
       GlobalWorkerOptions.workerSrc = workerUrl;
       const pdf = await getDocument({ data: await file.arrayBuffer() }).promise;
       if (current !== request.current) {
