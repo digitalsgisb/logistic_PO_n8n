@@ -123,7 +123,7 @@ export async function writeBatch(orders: Order[], template: string, destination:
       }
     }
   }
-  wb.creator = 'Toyota PO Converter';
+  wb.creator = 'Logistic Digital';
   wb.created = new Date();
   wb.modified = new Date();
   const archive = await JSZip.loadAsync(await wb.xlsx.writeBuffer());

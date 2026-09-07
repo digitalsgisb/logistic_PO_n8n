@@ -1,4 +1,4 @@
-# Toyota PO Converter
+# Logistic Digital
 
 An internal Toyota order converter: upload PDF purchase orders, extract them with local Ollama through n8n, and download one combined kanban workbook per delivery date.
 

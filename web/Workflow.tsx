@@ -86,7 +86,7 @@ export function Workflow({
       <div className="page-heading" id="po-converter">
         <div>
           <div className="eyebrow teal">DAILY LOGISTICS</div>
-          <h1>Prepare your dispatch</h1>
+          <h1>Logistic Digital</h1>
           <p>Upload documents, check your quantities, and print your rack tags.</p>
         </div>
         {active && (

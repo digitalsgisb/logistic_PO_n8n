@@ -254,12 +254,12 @@ function App() {
             <br />
             More clarity.
           </h1>
-          <p>Turn Toyota purchase orders into your daily kanban template.</p>
+          <p>Prepare your daily orders, kanban workbooks and rack tags in one workspace.</p>
           <div className="login-line" />
           <UnitMark />
         </div>
         <form className="login-form" onSubmit={login}>
-          <span className="eyebrow teal">TOYOTA PO CONVERTER</span>
+          <span className="eyebrow teal">LOGISTIC DIGITAL</span>
           <h2>Welcome back</h2>
           <p>Sign in to your internal workspace.</p>
           <label>
@@ -289,20 +289,20 @@ function App() {
           <button className="primary" disabled={loginBusy}>
             {loginBusy ? 'Signing in…' : 'Sign in'} <Icon name="arrow" size={18} />
           </button>
-          <small>Private server · Toyota pilot</small>
+          <small>Private workspace · Logistic Digital</small>
         </form>
       </div>
     );
   return (
     <div className="app">
       <header className="topbar">
-        <a className="mobile-brand" href="/" aria-label="Toyota PO Converter home">
+        <a className="mobile-brand" href="/" aria-label="Logistic Digital home">
           <CompanyLogo />
         </a>
         <nav className="header-context" aria-label="Breadcrumb">
-          <span>Operations</span>
+          <span>Workspace</span>
           <Icon name="arrow" size={15} />
-          <strong>Daily dispatch</strong>
+          <strong>Logistic Digital</strong>
         </nav>
         <div className="top-right">
           <span className="private-label">{session.username}</span>
@@ -324,10 +324,10 @@ function App() {
         </div>
       </header>
       <aside className="sidebar">
-        <a className="brand" href="/" aria-label="Toyota PO Converter home">
+        <a className="brand" href="/" aria-label="Logistic Digital home">
           <CompanyLogo />
           <span className="brand-workspace">
-            Operations<span className="brand-sub">TOYOTA DOCUMENT WORKSPACE</span>
+            Logistic Digital<span className="brand-sub">LOGISTICS DOCUMENT WORKSPACE</span>
           </span>
         </a>
         <p className="nav-label">WORKSPACE</p>
@@ -342,7 +342,7 @@ function App() {
         </a>
         <div className="sidebar-note">
           <div className="side-rule" />
-          <span className="eyebrow">TOYOTA PILOT</span>
+          <span className="eyebrow">LOGISTIC DIGITAL</span>
           <p>
             A simpler way to
             <br />
