@@ -1,4 +1,5 @@
 :root {
+  scroll-behavior: smooth;
   font-family: 'Segoe UI', Inter, Arial, sans-serif;
   color: #19212d;
   background: #f5f6f7;
@@ -1425,6 +1426,9 @@ h3 {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  :root {
+    scroll-behavior: auto;
+  }
   *,
   *::before,
   *::after {
