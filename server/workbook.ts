@@ -48,6 +48,17 @@ export async function writeBatch(orders: Order[], template: string, destination:
     // Fit-to-page preserves a single A4 sheet even when a busy trip needs extra lines.
     for (let row = 13; row <= 42; row++)
       sheet.getRow(row).height = Math.max(sheet.getRow(row).height ?? 0, 40.5);
+    // The template was designed for a much larger print sheet. Increase its text
+    // slightly so labels remain readable after Excel scales the grid onto A4.
+    for (let row = 4; row <= 42; row++)
+      for (let column = 1; column <= 31; column++) {
+        const cell = sheet.getCell(row, column);
+        if (cell.isMerged && cell.master.address !== cell.address) continue;
+        if (cell.value !== null && cell.font?.size) {
+          cell.style = structuredClone(cell.style);
+          cell.font = { ...cell.font, size: Math.min(cell.font.size + 2, 22) };
+        }
+      }
     sheet.getColumn(31).width = Math.max(sheet.getColumn(31).width ?? 0, 44);
     const [year, month, day] = date.split('-');
     sheet.getCell('F4').value = `DATE : ${day}/${month}/${year}`;
@@ -93,7 +104,7 @@ export async function writeBatch(orders: Order[], template: string, destination:
         cell.value = total;
         // Template cells can share style objects; each quantity needs its own markers.
         cell.style = structuredClone(cell.style);
-        cell.font = { ...cell.font, size: 18 };
+        cell.font = { ...cell.font, size: 20 };
         cell.alignment = { ...cell.alignment, wrapText: true, shrinkToFit: false };
         // A literal prefix in the number format keeps the underlying value numeric.
         if (markers.length === 1) {
@@ -115,7 +126,7 @@ export async function writeBatch(orders: Order[], template: string, destination:
         const cell = sheet.getCell(row + i, 31);
         cell.value = count ? numbers.slice(offset, offset + count).join('\n') : null;
         if (count) {
-          cell.font = { ...cell.font, size: 20, bold: true };
+          cell.font = { ...cell.font, size: 22, bold: true };
           cell.alignment = {
             ...cell.alignment,
             horizontal: 'left',

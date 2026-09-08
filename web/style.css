@@ -155,8 +155,7 @@
 .kanban-download-card {
   margin: 22px 0;
   padding: clamp(22px, 3vw, 34px);
-  border: 1px solid #a5d6b8;
-  border-top: 5px solid #107c41;
+  border: 1px solid #dde5ed;
   border-radius: 16px;
   background: linear-gradient(120deg, #eef9f1, #fff 80%);
   box-shadow: 0 8px 24px #107c410b;

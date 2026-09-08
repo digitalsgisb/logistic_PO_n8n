@@ -46,7 +46,7 @@ test('four sample orders produce one daily sheet with nine quantities and PO num
     assert.equal(s.getCell('H16').value, 30);
     assert.equal(s.getCell('H19').value, null);
     assert.equal(s.getCell('AE19').value, null);
-    assert.equal(s.getCell('AE17').font.size, 20);
+    assert.equal(s.getCell('AE17').font.size, 22);
     assert.equal(s.getCell('AE17').font.bold, true);
     assert.equal(s.getCell('AE15').value, null);
     assert.equal(s.pageSetup.printArea, 'A4:AE42');
@@ -57,6 +57,9 @@ test('four sample orders produce one daily sheet with nine quantities and PO num
     assert.equal(s.pageSetup.fitToHeight, 1);
     assert.equal(s.pageSetup.margins?.top, 0.2);
     assert.equal(s.getRow(42).height, 40.5);
+    assert.equal(s.getCell('A4').font.size, 20);
+    assert.equal(s.getCell('D8').font.size, 20);
+    assert.equal(s.getCell('V13').font.size, 20);
     assert.equal(s.getCell('V13').numFmt, '"* "0');
     assert.equal(s.getCell('W13').numFmt, '0');
     assert.equal(s.getCell('D16').numFmt, '0');
