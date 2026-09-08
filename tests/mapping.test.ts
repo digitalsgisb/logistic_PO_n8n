@@ -46,7 +46,7 @@ test('four sample orders produce one daily sheet with nine quantities and PO num
     assert.equal(s.getCell('H16').value, 30);
     assert.equal(s.getCell('H19').value, null);
     assert.equal(s.getCell('AE19').value, null);
-    assert.equal(s.getCell('AE17').font.size, 22);
+    assert.equal(s.getCell('AE17').font.size, 24);
     assert.equal(s.getCell('AE17').font.bold, true);
     assert.equal(s.getCell('AE15').value, null);
     assert.equal(s.pageSetup.printArea, 'A4:AE42');
@@ -55,12 +55,12 @@ test('four sample orders produce one daily sheet with nine quantities and PO num
     assert.equal(s.pageSetup.fitToPage, true);
     assert.equal(s.pageSetup.fitToWidth, 1);
     assert.equal(s.pageSetup.fitToHeight, 1);
-    assert.equal(s.pageSetup.margins?.top, 0.2);
-    assert.equal(s.getRow(42).height, 40.5);
-    assert.equal(s.getCell('A4').font.size, 20);
-    assert.equal(s.getCell('D8').font.size, 20);
-    assert.equal(s.getCell('V13').font.size, 20);
-    assert.equal(s.getCell('V13').numFmt, '"* "0');
+    assert.equal(s.pageSetup.margins?.top, 0.1);
+    assert.equal(s.getRow(42).height, 35.1);
+    assert.equal(s.getCell('A4').font.size, 22);
+    assert.equal(s.getCell('D8').font.size, 22);
+    assert.equal(s.getCell('V13').font.size, 22);
+    assert.equal(s.getCell('V13').numFmt, '"*"0');
     assert.equal(s.getCell('W13').numFmt, '0');
     assert.equal(s.getCell('D16').numFmt, '0');
     assert.equal(s.getCell('W16').numFmt, '0');
@@ -159,7 +159,7 @@ test('markers are destination-local and prioritize HOOK independently of upload 
       assert.equal(sheet.getCell('D13').numFmt, '0');
       assert.equal(sheet.getCell('V13').value, 600);
       if (batch.length === 4) {
-        assert.equal(sheet.getCell('V13').numFmt, '"* "0');
+        assert.equal(sheet.getCell('V13').numFmt, '"*"0');
         assert.ok(remarks.includes('* SGIS12AA0747-SA'));
         assert.ok(remarks.includes('SGIS12DA3251-SA'));
         assert.ok(remarks.includes('** SGIS12DA3252-SA'));

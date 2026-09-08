@@ -43,11 +43,7 @@ export async function writeBatch(orders: Order[], template: string, destination:
     sheet.pageSetup.fitToWidth = 1;
     sheet.pageSetup.fitToHeight = 1;
     sheet.pageSetup.printArea = 'A4:AE42';
-    sheet.pageSetup.margins = { left: 0.2, right: 0.2, top: 0.2, bottom: 0.2, header: 0, footer: 0 };
-    // Give the trip grid the taller proportions of the printed reference.
-    // Fit-to-page preserves a single A4 sheet even when a busy trip needs extra lines.
-    for (let row = 13; row <= 42; row++)
-      sheet.getRow(row).height = Math.max(sheet.getRow(row).height ?? 0, 40.5);
+    sheet.pageSetup.margins = { left: 0.1, right: 0.1, top: 0.1, bottom: 0.1, header: 0, footer: 0 };
     // The template was designed for a much larger print sheet. Increase its text
     // slightly so labels remain readable after Excel scales the grid onto A4.
     for (let row = 4; row <= 42; row++)
@@ -56,7 +52,7 @@ export async function writeBatch(orders: Order[], template: string, destination:
         if (cell.isMerged && cell.master.address !== cell.address) continue;
         if (cell.value !== null && cell.font?.size) {
           cell.style = structuredClone(cell.style);
-          cell.font = { ...cell.font, size: Math.min(cell.font.size + 2, 22) };
+          cell.font = { ...cell.font, size: Math.min(cell.font.size + (row === 9 ? 2 : 4), 26) };
         }
       }
     sheet.getColumn(31).width = Math.max(sheet.getColumn(31).width ?? 0, 44);
@@ -104,11 +100,11 @@ export async function writeBatch(orders: Order[], template: string, destination:
         cell.value = total;
         // Template cells can share style objects; each quantity needs its own markers.
         cell.style = structuredClone(cell.style);
-        cell.font = { ...cell.font, size: 20 };
+        cell.font = { ...cell.font, size: 22 };
         cell.alignment = { ...cell.alignment, wrapText: true, shrinkToFit: false };
         // A literal prefix in the number format keeps the underlying value numeric.
         if (markers.length === 1) {
-          cell.numFmt = markers[0] ? `"${markers[0]} "0` : '0';
+          cell.numFmt = markers[0] ? `"${markers[0]}"0` : '0';
         } else {
           const lines = markers.filter(Boolean);
           cell.numFmt = `0"\n${lines.join('\n')}"`;
@@ -126,7 +122,7 @@ export async function writeBatch(orders: Order[], template: string, destination:
         const cell = sheet.getCell(row + i, 31);
         cell.value = count ? numbers.slice(offset, offset + count).join('\n') : null;
         if (count) {
-          cell.font = { ...cell.font, size: 22, bold: true };
+          cell.font = { ...cell.font, size: 24, bold: true };
           cell.alignment = {
             ...cell.alignment,
             horizontal: 'left',
