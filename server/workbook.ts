@@ -42,6 +42,12 @@ export async function writeBatch(orders: Order[], template: string, destination:
     sheet.pageSetup.fitToPage = true;
     sheet.pageSetup.fitToWidth = 1;
     sheet.pageSetup.fitToHeight = 1;
+    sheet.pageSetup.printArea = 'A4:AE42';
+    sheet.pageSetup.margins = { left: 0.2, right: 0.2, top: 0.2, bottom: 0.2, header: 0, footer: 0 };
+    // Give the trip grid the taller proportions of the printed reference.
+    // Fit-to-page preserves a single A4 sheet even when a busy trip needs extra lines.
+    for (let row = 13; row <= 42; row++)
+      sheet.getRow(row).height = Math.max(sheet.getRow(row).height ?? 0, 40.5);
     sheet.getColumn(31).width = Math.max(sheet.getColumn(31).width ?? 0, 44);
     const [year, month, day] = date.split('-');
     sheet.getCell('F4').value = `DATE : ${day}/${month}/${year}`;

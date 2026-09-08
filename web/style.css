@@ -152,6 +152,87 @@
   gap: 12px;
   flex-wrap: wrap;
 }
+.kanban-download-card {
+  margin: 22px 0;
+  padding: clamp(22px, 3vw, 34px);
+  border: 1px solid #a5d6b8;
+  border-top: 5px solid #107c41;
+  border-radius: 16px;
+  background: linear-gradient(120deg, #eef9f1, #fff 80%);
+  box-shadow: 0 8px 24px #107c410b;
+}
+.kanban-card-heading {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+.kanban-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex: 0 0 64px;
+  height: 64px;
+  border-radius: 14px;
+  background: #107c41;
+  color: white;
+  font-size: 30px;
+  font-weight: 800;
+}
+.kanban-card-icon span {
+  font-size: 26px;
+  opacity: 0.65;
+}
+.kanban-card-eyebrow {
+  color: #176c3c;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+.kanban-card-heading h3 {
+  margin: 7px 0;
+  color: #14552f;
+  font-size: clamp(22px, 2vw, 28px);
+}
+.kanban-card-heading p {
+  margin: 0;
+  line-height: 1.6;
+}
+.kanban-download-card .excel-download {
+  min-height: 68px;
+  flex: 1 1 250px;
+  font-size: 16px;
+}
+.kanban-download-card .kanban-card-note {
+  font-size: 12px;
+  margin: 18px 0 0;
+  color: #3e7052;
+}
+.kanban-download-all {
+  display: inline-block;
+  margin-top: 18px;
+  color: #176c3c;
+  text-decoration: underline;
+  font-weight: 600;
+}
+@media (max-width: 600px) {
+  .kanban-card-heading {
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .kanban-card-icon {
+    flex-basis: 42px;
+    height: 46px;
+    font-size: 22px;
+  }
+  .kanban-card-icon span {
+    display: none;
+  }
+  .kanban-download-card .excel-download {
+    min-width: 0;
+  }
+}
 .daily-download {
   display: inline-flex;
   gap: 12px;

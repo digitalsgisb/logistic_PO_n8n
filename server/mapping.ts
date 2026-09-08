@@ -1,5 +1,6 @@
 import type { Destination, Extraction, Order, Page, Result } from './types.ts';
 import { createHash } from 'node:crypto';
+import { taggingIdentity } from './taggingIdentity.ts';
 export const headers: Record<string, { column: number; destination: Destination }> = Object.fromEntries(
   [
     '9V82',
@@ -141,6 +142,7 @@ export function validatePage(raw: unknown, page: Page): Order {
     route,
     kb_number: kbNumber(x.source_order_id, place),
     delivery_sequence: sequence,
+    tagging_identity: taggingIdentity(page.text),
     trip,
     source_pages: [`${page.filename} / page ${page.number}`],
     source_page_ids: [page.id],

@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ExcelDownload } from './ExcelDownload';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?worker&url';
 
@@ -8,6 +7,7 @@ type Page = {
   kind: string;
   place: string;
   sequence: string;
+  identity?: { dock?: string; lane?: string };
   copies: number;
   lines: { code: string; racks: number; tagRacks?: number; multiplier: number; copies: number }[];
   notes: string[];
@@ -292,11 +292,6 @@ export function Tagging({
               <section className="dispatch-date" key={date}>
                 <header>
                   <h3>{date.includes('-') ? date.split('-').reverse().join('/') : date}</h3>
-                  {workbooks
-                    .filter((w) => w.date === date)
-                    .map((w) => (
-                      <ExcelDownload href={w.href} key={w.id} date={w.date} orders={w.order_count} />
-                    ))}
                 </header>
                 {[
                   ...new Set(
@@ -350,6 +345,8 @@ export function Tagging({
                                 {p.sequence
                                   ? `${p.sequence.slice(6, 8)}/${p.sequence.slice(4, 6)}/${p.sequence.slice(0, 4)} · Trip ${Number(p.sequence.slice(-2))}`
                                   : 'Check date / trip'}
+                                {p.identity?.dock && ` · Dock ${p.identity.dock}`}
+                                {p.identity?.lane && ` · Lane ${p.identity.lane}`}
                               </p>
                               {!!p.lines.length && (
                                 <table>
@@ -358,7 +355,7 @@ export function Tagging({
                                       <th>Part</th>
                                       <th>{p.matchedOrders.length ? 'PO racks' : 'Racks'}</th>
                                       {!!p.matchedOrders.length && <th>Tags found</th>}
-                                      <th>Tags/rack</th>
+                                      <th>Copy rule</th>
                                       <th>Copies</th>
                                     </tr>
                                   </thead>
@@ -368,7 +365,11 @@ export function Tagging({
                                         <td>{l.code}</td>
                                         <td>{l.racks}</td>
                                         {!!p.matchedOrders.length && <td>{l.tagRacks}</td>}
-                                        <td>{l.multiplier}</td>
+                                        <td>
+                                          {p.place === 'SHAH ALAM' && l.code === 'HU83'
+                                            ? '2 total'
+                                            : `${l.multiplier} per rack`}
+                                        </td>
                                         <td>{l.copies}</td>
                                       </tr>
                                     ))}

@@ -16,6 +16,7 @@ export interface Extraction {
   items: LineItem[];
 }
 export interface Order extends Omit<Extraction, 'destination'> {
+  tagging_identity?: import('./taggingIdentity.ts').TaggingIdentity;
   destination: Destination;
   kb_number: string;
   delivery_sequence: string;

@@ -248,8 +248,30 @@ export function Workflow({
       </details>
       <section className="workflow-review" id="workflow-review">
         <h2>2. Review your dispatch</h2>
-        {ready.length > 1 && (
-          <ExcelDownload href={`/api/jobs/${job!.id}/download-all`} files={ready.length} />
+        {!!workbooks.length && (
+          <section className="kanban-download-card" aria-labelledby="kanban-download-title">
+            <div className="kanban-card-heading">
+              <span className="kanban-card-icon" aria-hidden="true">
+                X<span>▦</span>
+              </span>
+              <div>
+                <span className="kanban-card-eyebrow">EXCEL WORKBOOK · READY</span>
+                <h3 id="kanban-download-title">Download your Kanban Excel</h3>
+                <p>Your daily Kanban sheet is ready. Download it here, then open Excel to print.</p>
+              </div>
+            </div>
+            <div className="workflow-workbooks">
+              {workbooks.map((r) => (
+                <ExcelDownload href={r.href} key={r.id} date={r.date} orders={r.order_count} />
+              ))}
+            </div>
+            {ready.length > 1 && (
+              <a className="kanban-download-all" href={`/api/jobs/${job!.id}/download-all`}>
+                Download all {ready.length} workbooks as ZIP ↓
+              </a>
+            )}
+            <p className="kanban-card-note">One workbook per delivery date · A4 landscape</p>
+          </section>
         )}
         {!active ? (
           <p>Your daily workbooks and rack quantities will appear here.</p>
@@ -271,16 +293,6 @@ export function Workflow({
           <button className="outline" onClick={retry}>
             Retry unsuccessful POs
           </button>
-        )}
-        {canReview && (mode === 'po' || !tag) && (
-          <>
-            <div className="workflow-workbooks">
-              {workbooks.map((r) => (
-                <ExcelDownload href={r.href} key={r.id} date={r.date} orders={r.order_count} />
-              ))}
-            </div>
-            <p>Your Excel files are ready.</p>
-          </>
         )}
         {canReview && mode !== 'po' && !tag && (
           <p className="tag-warning">

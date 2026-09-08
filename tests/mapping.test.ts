@@ -55,6 +55,8 @@ test('four sample orders produce one daily sheet with nine quantities and PO num
     assert.equal(s.pageSetup.fitToPage, true);
     assert.equal(s.pageSetup.fitToWidth, 1);
     assert.equal(s.pageSetup.fitToHeight, 1);
+    assert.equal(s.pageSetup.margins?.top, 0.2);
+    assert.equal(s.getRow(42).height, 40.5);
     assert.equal(s.getCell('V13').numFmt, '"* "0');
     assert.equal(s.getCell('W13').numFmt, '0');
     assert.equal(s.getCell('D16').numFmt, '0');

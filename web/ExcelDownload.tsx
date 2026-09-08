@@ -11,7 +11,7 @@ export function ExcelDownload({
   orders?: number;
   files?: number;
 }) {
-  const label = files ? 'Download all Excel files' : 'Download Excel';
+  const label = files ? 'Download all Excel files' : 'Download Kanban Excel';
   const detail = files
     ? `${files} workbooks · ZIP file`
     : [
