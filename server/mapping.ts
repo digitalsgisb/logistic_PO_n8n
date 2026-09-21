@@ -1,6 +1,12 @@
 import type { Destination, Extraction, Order, Page, Result } from './types.ts';
 import { createHash } from 'node:crypto';
 import { taggingIdentity } from './taggingIdentity.ts';
+
+const orderIdPattern = /^SGIS\d{2}[A-Z]{2}\d{4}$/;
+const sourceOrderIds = (text: string) => [
+  ...new Set(text.toUpperCase().match(/\bSGIS\d{2}[A-Z]{2}\d{4}\b/g) ?? []),
+];
+
 export const headers: Record<string, { column: number; destination: Destination }> = Object.fromEntries(
   [
     '9V82',
@@ -41,7 +47,7 @@ export function destination(value: string): Destination {
   return sa ? 'SHAH ALAM' : 'BUKIT RAJA';
 }
 export function kbNumber(id: string, place: Destination) {
-  if (!/^SGIS[A-Z0-9]+$/.test(id)) throw new Error('Invalid original order identifier.');
+  if (!orderIdPattern.test(id)) throw new Error('Invalid original order identifier.');
   return `${id}-${place === 'SHAH ALAM' ? 'SA' : 'BR'}`;
 }
 export function isoDate(value: string) {
@@ -66,9 +72,9 @@ function deliverySequence(text: string, date: string) {
 export function validatePage(raw: unknown, page: Page): Order {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('AI returned no order object.');
   const x = raw as Extraction;
-  if (typeof x.source_order_id !== 'string' || !/^SGIS[A-Z0-9]+$/.test(x.source_order_id))
+  if (typeof x.source_order_id !== 'string' || !orderIdPattern.test(x.source_order_id))
     throw new Error('Invalid original order identifier.');
-  const sourceIds = [...new Set(page.text.toUpperCase().match(/SGIS\d+[A-Z]+\d+/g) ?? [])];
+  const sourceIds = sourceOrderIds(page.text);
   if (sourceIds.length !== 1 || sourceIds[0] !== x.source_order_id)
     throw new Error('Order identifier does not match the source page.');
   const place = destination(x.destination);
@@ -151,7 +157,7 @@ export function validatePage(raw: unknown, page: Page): Order {
 export function assemble(pages: Page[]): { orders: Order[]; errors: Result[] } {
   const groups = new Map<string, Page[]>();
   for (const page of pages) {
-    const ids = [...new Set(page.text.match(/SGIS\d+[A-Z]+\d+/g) ?? [])];
+    const ids = sourceOrderIds(page.text);
     // Include failed pages in the group, so an incomplete order cannot be released.
     let place = 'UNKNOWN';
     try {

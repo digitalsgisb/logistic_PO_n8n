@@ -42,8 +42,8 @@ Edit `.env` locally. Set:
 | `N8N_NETWORK`     | Existing n8n Docker network, shown by `docker network ls`                                                  |
 | `N8N_WEBHOOK_URL` | Production webhook, usually `http://n8n:5678/webhook/toyota-po`; use the existing container's service name |
 | `BIND_IP`         | `127.0.0.1` for the local tunnel origin; use `100.109.37.96` only when direct Tailscale access is required |
-| `WEB_PORT`        | `3500`                                                                                                  |
-| `PILOT_USERNAME`  | Shared pilot account name, default `pilot`                                                                 |
+| `WEB_PORT`        | `3500`                                                                                                     |
+| `PILOT_USERNAME`  | Bootstrap administrator account, default `pilot`; additional operators are added in the app                |
 | `COOKIE_SECURE`   | `false` for HTTP over Tailscale; `true` behind HTTPS                                                       |
 
 Do not put `.env` into Git. The repository ignores credentials, runtime storage, generated outputs, and the supplied original business documents.
@@ -67,6 +67,12 @@ docker compose logs --tail=80 api
 ```
 
 Open **http://127.0.0.1:3500** on the server, or use the hostname configured in your tunnel, and sign in with the account from `.env`. Upload the sample PDF and verify one downloadable workbook containing four orders and nine item lines.
+
+### Accounts and persistent sign-in
+
+The `.env` pilot login is created as the bootstrap administrator the first time the API starts. Open **Account** in the top bar to add or remove operator accounts and to change your own password. Operators share the logistics workspace but cannot manage other accounts.
+
+Accounts and sessions are stored in the persistent `toyota-data` volume. Sessions have no server-side expiry and active browser cookies are renewed on every request, so rebuilding or updating the containers does not sign users out. Browsers impose their own persistent-cookie limit (commonly 400 days), and signing out, deleting an account, clearing browser data, or removing the Docker volume still ends the session. A password change signs out that account's other sessions.
 
 ### Existing deployment: switch to localhost:3500
 
@@ -93,7 +99,7 @@ git pull --ff-only
 docker compose up -d --build
 ```
 
-Jobs, original uploads, extracted values, and outputs are stored in the `toyota-data` volume. Back up that volume if required. Do not use `docker compose down -v` when keeping jobs. New application versions preserve the volume; interrupted work is marked retryable after restart. Files and job records expire after seven days by default.
+Jobs, original uploads, extracted values, outputs, user accounts, and login sessions are stored in the `toyota-data` volume. Back up that volume if required. Do not use `docker compose down -v` when keeping jobs or accounts. New application versions preserve the volume; interrupted work is marked retryable after restart. Files and job records expire after seven days by default; accounts and sessions do not.
 
 For the combined-output update, keep your working `.env`, Compose networking changes, and n8n workflow URLs. Only the application needs rebuilding. Completed jobs keep their existing downloads; choose **Start new batch** and upload the PDFs again to get the new combined layout. Retried partial jobs rebuild a single workbook from all valid orders.
 

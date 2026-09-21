@@ -856,6 +856,20 @@ svg {
   border: 1px solid #dbe0e8;
   font-size: 12px;
 }
+.account-trigger {
+  cursor: pointer;
+  color: #10294d;
+}
+.account-button {
+  color: #1c2e4a;
+  background: transparent;
+  border: 0;
+  font-size: 12px;
+  padding: 9px 0;
+}
+.account-button:hover {
+  color: #087f86;
+}
 .signout {
   color: #1c2e4a;
   background: #fff;
@@ -867,6 +881,145 @@ svg {
 }
 .signout:hover {
   background: #dce4ef;
+}
+.account-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(8 28 55 / 55%);
+  backdrop-filter: blur(3px);
+}
+.account-panel {
+  width: min(680px, 100%);
+  max-height: min(850px, calc(100vh - 48px));
+  overflow-y: auto;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 28px 80px rgb(4 21 42 / 32%);
+  padding: 30px;
+}
+.account-panel-heading,
+.account-section-heading,
+.account-row {
+  display: flex;
+  align-items: center;
+}
+.account-panel-heading,
+.account-section-heading {
+  justify-content: space-between;
+  gap: 20px;
+}
+.account-panel-heading h2 {
+  margin: 6px 0 2px;
+  color: #102f56;
+}
+.account-panel-heading p,
+.account-section-heading p {
+  margin: 0;
+  color: #6b7789;
+  font-size: 13px;
+}
+.account-close {
+  align-self: flex-start;
+  width: 38px;
+  height: 38px;
+  border: 1px solid #d8e0eb;
+  border-radius: 10px;
+  background: #fff;
+  color: #526276;
+  font-size: 24px;
+  line-height: 1;
+}
+.account-success {
+  margin-top: 18px;
+  border: 1px solid #a8ddd4;
+  border-radius: 9px;
+  background: #edf9f6;
+  color: #176c61;
+  padding: 12px 14px;
+  font-size: 13px;
+}
+.account-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: end;
+  gap: 14px;
+  margin-top: 24px;
+  padding-top: 22px;
+  border-top: 1px solid #e6ebf2;
+}
+.account-form h3 {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #17395f;
+  font-size: 16px;
+}
+.account-form label {
+  display: grid;
+  gap: 7px;
+  color: #4b5b70;
+  font-size: 12px;
+  font-weight: 600;
+}
+.account-form input {
+  min-width: 0;
+  border: 1px solid #ccd6e3;
+  border-radius: 8px;
+  padding: 10px 11px;
+  color: #152d4c;
+  font: inherit;
+}
+.account-admin {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid #dfe6ef;
+}
+.account-section-heading h3 {
+  margin: 0 0 4px;
+  color: #17395f;
+}
+.account-section-heading > span {
+  border-radius: 999px;
+  background: #edf3fa;
+  color: #52667f;
+  padding: 5px 9px;
+  font-size: 11px;
+}
+.account-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 15px;
+}
+.account-row {
+  gap: 12px;
+  border: 1px solid #e1e7ef;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.account-row > div {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+}
+.account-row strong {
+  color: #19395e;
+  font-size: 13px;
+}
+.account-row small {
+  color: #7a8697;
+  font-size: 11px;
+}
+.account-remove {
+  border: 0;
+  background: transparent;
+  color: #a13b3b;
+  font-size: 12px;
+}
+.account-create {
+  border-top-style: dashed;
 }
 .sidebar {
   position: fixed;
@@ -1732,6 +1885,24 @@ h3 {
   .signout {
     font-size: 11px;
     padding: 8px 10px;
+  }
+  .account-button {
+    padding: 8px 6px;
+  }
+  .account-overlay {
+    align-items: end;
+    padding: 0;
+  }
+  .account-panel {
+    max-height: 92vh;
+    border-radius: 18px 18px 0 0;
+    padding: 24px 18px;
+  }
+  .account-form {
+    grid-template-columns: 1fr;
+  }
+  .account-row .avatar {
+    display: grid;
   }
   main {
     padding: 22px 18px;

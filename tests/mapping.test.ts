@@ -186,6 +186,14 @@ test('destination normalization and suffix derivation preserve the original ID',
   assert.equal(p.extraction?.source_order_id, 'SGIS12AA0747');
 });
 
+test('reprint system codes are not mistaken for additional order identifiers', () => {
+  const p = pageFor(orders[3]);
+  p.text += '\nREPRINT # 1 (SGIS1P02)';
+  const order = validatePage(p.extraction, p);
+  assert.equal(order.source_order_id, 'SGIS13FA5002');
+  assert.equal(assemble([p]).orders.length, 1);
+});
+
 test('trip comes from the printed delivery sequence independently of the route suffix', () => {
   for (const trip of [1, 2, 10]) {
     const p = pageFor(orders[3]);

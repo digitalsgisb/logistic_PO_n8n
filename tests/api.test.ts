@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
+import { createHmac } from 'node:crypto';
 import ExcelJS from 'exceljs';
 import JSZip from 'jszip';
 import { buildApp } from '../server/app.ts';
@@ -24,6 +25,106 @@ function multipart(files: { name: string; bytes: Buffer }[]) {
     type: `multipart/form-data; boundary=${boundary}`,
   };
 }
+
+test('accounts and persistent sessions survive an application restart', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'toyota-accounts-'));
+  const options = {
+    ...config,
+    dataDir: dir,
+    username: 'pilot',
+    password: 'admin-password-123',
+    sessionSecret: 's'.repeat(40),
+    serviceSecret: 'k'.repeat(40),
+  };
+  const first = await buildApp(options);
+  let adminCookie = '';
+  try {
+    const payload = `${Date.now() + 3600000}.legacy-session`;
+    const signature = createHmac('sha256', options.sessionSecret).update(payload).digest('hex');
+    const migrated = await first.app.inject({
+      url: '/api/session',
+      headers: { cookie: `toyota_session=${payload}.${signature}` },
+    });
+    assert.equal(migrated.statusCode, 200, migrated.body);
+    assert.match(String(migrated.headers['set-cookie']), /Max-Age=34560000/);
+
+    const login = await first.app.inject({
+      method: 'POST',
+      url: '/api/login',
+      headers: { 'x-requested-with': 'ToyotaPO' },
+      payload: { username: options.username, password: options.password },
+    });
+    adminCookie = String(login.headers['set-cookie']).split(';')[0];
+    assert.match(String(login.headers['set-cookie']), /Max-Age=34560000/);
+    const create = await first.app.inject({
+      method: 'POST',
+      url: '/api/accounts',
+      headers: { cookie: adminCookie, 'x-requested-with': 'ToyotaPO' },
+      payload: { username: 'operator.two', password: 'operator-password-123' },
+    });
+    assert.equal(create.statusCode, 201, create.body);
+    assert.deepEqual(
+      (await first.app.inject({ url: '/api/accounts', headers: { cookie: adminCookie } }))
+        .json()
+        .accounts.map((account: { username: string }) => account.username),
+      ['operator.two', 'pilot'],
+    );
+  } finally {
+    await first.app.close();
+  }
+
+  const second = await buildApp(options);
+  try {
+    const resumed = await second.app.inject({ url: '/api/session', headers: { cookie: adminCookie } });
+    assert.equal(resumed.statusCode, 200, resumed.body);
+    assert.equal(resumed.json().username, 'pilot');
+    assert.equal(resumed.json().isAdmin, true);
+
+    const operatorLogin = await second.app.inject({
+      method: 'POST',
+      url: '/api/login',
+      headers: { 'x-requested-with': 'ToyotaPO' },
+      payload: { username: 'operator.two', password: 'operator-password-123' },
+    });
+    const operatorCookie = String(operatorLogin.headers['set-cookie']).split(';')[0];
+    assert.equal(
+      (await second.app.inject({ url: '/api/accounts', headers: { cookie: operatorCookie } })).statusCode,
+      403,
+    );
+    const changed = await second.app.inject({
+      method: 'POST',
+      url: '/api/account/password',
+      headers: { cookie: operatorCookie, 'x-requested-with': 'ToyotaPO' },
+      payload: { currentPassword: 'operator-password-123', newPassword: 'replacement-password-123' },
+    });
+    assert.equal(changed.statusCode, 200, changed.body);
+    assert.equal(
+      (
+        await second.app.inject({
+          method: 'POST',
+          url: '/api/login',
+          headers: { 'x-requested-with': 'ToyotaPO' },
+          payload: { username: 'operator.two', password: 'operator-password-123' },
+        })
+      ).statusCode,
+      401,
+    );
+    const removed = await second.app.inject({
+      method: 'DELETE',
+      url: '/api/accounts/operator.two',
+      headers: { cookie: adminCookie, 'x-requested-with': 'ToyotaPO' },
+    });
+    assert.equal(removed.statusCode, 200, removed.body);
+    assert.equal(
+      (await second.app.inject({ url: '/api/session', headers: { cookie: operatorCookie } })).statusCode,
+      401,
+    );
+  } finally {
+    await second.app.close();
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('authenticated upload → n8n callbacks → one combined download; duplicates, ZIP, persistence, stale callback protection', async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'toyota-api-'));
   const receiver = http.createServer((_req, res) => {

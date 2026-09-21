@@ -16,6 +16,23 @@ import type { Job } from './types.ts';
 import { readPdf } from './pdf.ts';
 import { assemble } from './mapping.ts';
 import { analyseTagging } from './tagging.ts';
+import { validPassword, validUsername } from './auth.ts';
+import type { UserAccount } from './store.ts';
+
+const persistentCookie = (secure: boolean) => ({
+  httpOnly: true,
+  sameSite: 'strict' as const,
+  secure,
+  path: '/',
+  // Browsers cap persistent cookies (Chrome currently caps them at 400 days).
+  // Refreshing it on every authenticated request makes active sessions indefinite.
+  maxAge: 400 * 24 * 3600,
+});
+
+type AuthenticatedRequest = {
+  authUser?: UserAccount;
+  authToken?: string;
+};
 const equal = (a: string, b: string) => {
   const aa = Buffer.from(a),
     bb = Buffer.from(b);
@@ -28,6 +45,7 @@ export async function buildApp(options = config) {
   });
   const store = new Store(options.dataDir),
     engine = new Engine(store, options);
+  store.ensureBootstrapUser(options.username, options.password);
   await app.register(cookie);
   await app.register(rateLimit, { global: false });
   await app.register(multipart, {
@@ -48,10 +66,25 @@ export async function buildApp(options = config) {
     if (!['GET', 'HEAD'].includes(req.method) && req.headers['x-requested-with'] !== 'ToyotaPO')
       return reply.code(403).send({ error: 'Request origin check failed.' });
     if (req.url === '/api/login') return;
-    const token = req.cookies.toyota_session ?? '',
-      [expiry, nonce, signature] = token.split('.');
-    if (!signature || Number(expiry) < Date.now() || !equal(signature, sign(`${expiry}.${nonce}`)))
-      return reply.code(401).send({ error: 'Please sign in.' });
+    let token = req.cookies.toyota_session ?? '';
+    let user = store.userForSession(token);
+    if (!user) {
+      // One-time migration for a still-valid cookie issued by versions before persistent sessions.
+      const [expiry, nonce, signature] = token.split('.');
+      if (
+        signature &&
+        Number(expiry) >= Date.now() &&
+        equal(signature, sign(`${expiry}.${nonce}`)) &&
+        store.getUser(options.username)
+      ) {
+        token = store.createSession(options.username);
+        user = store.getUser(options.username);
+      }
+    }
+    if (!user) return reply.code(401).send({ error: 'Please sign in.' });
+    (req as typeof req & AuthenticatedRequest).authUser = user;
+    (req as typeof req & AuthenticatedRequest).authToken = token;
+    reply.setCookie('toyota_session', token, persistentCookie(options.secureCookie));
   });
   app.setErrorHandler((error, req, reply) => {
     const e = error as Error & { statusCode?: number };
@@ -69,32 +102,77 @@ export async function buildApp(options = config) {
     { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
     async (req, reply) => {
       const body = req.body as { username?: string; password?: string };
-      if (
-        !equal(String(body?.username ?? ''), options.username) ||
-        !equal(String(body?.password ?? ''), options.password)
-      )
-        return reply.code(401).send({ error: 'Incorrect username or password.' });
-      const payload = `${Date.now() + 12 * 3600000}.${randomUUID()}`;
-      reply.setCookie('toyota_session', `${payload}.${sign(payload)}`, {
-        httpOnly: true,
-        sameSite: 'strict',
-        secure: options.secureCookie,
-        path: '/',
-        maxAge: 12 * 3600,
-      });
+      const user = store.authenticate(String(body?.username ?? '').trim(), String(body?.password ?? ''));
+      if (!user) return reply.code(401).send({ error: 'Incorrect username or password.' });
+      const token = store.createSession(user.username);
+      reply.setCookie('toyota_session', token, persistentCookie(options.secureCookie));
       return { ok: true };
     },
   );
-  app.get('/api/session', () => ({
-    username: options.username,
-    limits: {
-      files: options.maxFiles,
-      fileMb: options.maxFileBytes / 1024 ** 2,
-      batchMb: options.maxBatchBytes / 1024 ** 2,
-    },
-  }));
-  app.post('/api/logout', async (_req, reply) => {
+  const current = (req: AuthenticatedRequest) => {
+    if (!req.authUser || !req.authToken)
+      throw Object.assign(new Error('Please sign in.'), { statusCode: 401 });
+    return { user: req.authUser, token: req.authToken };
+  };
+  const admin = (req: AuthenticatedRequest) => {
+    const auth = current(req);
+    if (!auth.user.isAdmin)
+      throw Object.assign(new Error('Administrator access required.'), { statusCode: 403 });
+    return auth;
+  };
+  app.get('/api/session', (req) => {
+    const { user } = current(req as typeof req & AuthenticatedRequest);
+    return {
+      username: user.username,
+      isAdmin: user.isAdmin,
+      limits: {
+        files: options.maxFiles,
+        fileMb: options.maxFileBytes / 1024 ** 2,
+        batchMb: options.maxBatchBytes / 1024 ** 2,
+      },
+    };
+  });
+  app.post('/api/logout', async (req, reply) => {
+    store.deleteSession(current(req as typeof req & AuthenticatedRequest).token);
     reply.clearCookie('toyota_session', { path: '/' });
+    return { ok: true };
+  });
+  app.get('/api/accounts', (req) => {
+    admin(req as typeof req & AuthenticatedRequest);
+    return { accounts: store.listUsers() };
+  });
+  app.post('/api/accounts', (req, reply) => {
+    admin(req as typeof req & AuthenticatedRequest);
+    const body = req.body as { username?: string; password?: string };
+    const username = String(body?.username ?? '').trim();
+    const password = String(body?.password ?? '');
+    if (!validUsername(username))
+      return reply
+        .code(400)
+        .send({ error: 'Username must be 3–32 letters, numbers, dots, dashes, or underscores.' });
+    if (!validPassword(password))
+      return reply.code(400).send({ error: 'Password must be 12–200 characters.' });
+    if (store.getUser(username)) return reply.code(409).send({ error: 'That username already exists.' });
+    reply.code(201);
+    return store.createUser(username, password);
+  });
+  app.delete<{ Params: { username: string } }>('/api/accounts/:username', (req, reply) => {
+    const { user } = admin(req as typeof req & AuthenticatedRequest);
+    if (user.username.toLowerCase() === req.params.username.toLowerCase())
+      return reply.code(400).send({ error: 'You cannot remove the account you are using.' });
+    if (!store.deleteUser(req.params.username)) return reply.code(404).send({ error: 'Account not found.' });
+    return { ok: true };
+  });
+  app.post('/api/account/password', (req, reply) => {
+    const { user, token } = current(req as typeof req & AuthenticatedRequest);
+    const body = req.body as { currentPassword?: string; newPassword?: string };
+    if (!store.authenticate(user.username, String(body?.currentPassword ?? '')))
+      return reply.code(401).send({ error: 'Current password is incorrect.' });
+    const password = String(body?.newPassword ?? '');
+    if (!validPassword(password))
+      return reply.code(400).send({ error: 'New password must be 12–200 characters.' });
+    store.updatePassword(user.username, password);
+    store.deleteOtherSessions(user.username, token);
     return { ok: true };
   });
   app.post('/api/jobs', async (req, reply) => {

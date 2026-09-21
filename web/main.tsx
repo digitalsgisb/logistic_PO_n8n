@@ -103,11 +103,197 @@ async function api(url: string, method = 'GET', body?: unknown) {
     throw Object.assign(new Error(data.error ?? 'Request failed'), { status: response.status });
   return data;
 }
+
+type Session = {
+  username: string;
+  isAdmin: boolean;
+  limits: { files: number; fileMb: number; batchMb: number };
+};
+
+type Account = { username: string; isAdmin: boolean; createdAt: string };
+
+function AccountPanel({ session, close }: { session: Session; close: () => void }) {
+  const [accounts, setAccounts] = useState<Account[]>([]),
+    [newUsername, setNewUsername] = useState(''),
+    [newUserPassword, setNewUserPassword] = useState(''),
+    [currentPassword, setCurrentPassword] = useState(''),
+    [newPassword, setNewPassword] = useState(''),
+    [busy, setBusy] = useState(false),
+    [message, setMessage] = useState(''),
+    [panelError, setPanelError] = useState('');
+  const loadAccounts = () => {
+    if (session.isAdmin)
+      api('/api/accounts')
+        .then((data) => setAccounts(data.accounts))
+        .catch((e) => setPanelError(e.message));
+  };
+  useEffect(loadAccounts, [session.isAdmin]);
+  const run = async (action: () => Promise<void>) => {
+    setBusy(true);
+    setPanelError('');
+    setMessage('');
+    try {
+      await action();
+    } catch (e) {
+      setPanelError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div
+      className="account-overlay"
+      role="presentation"
+      onMouseDown={(e) => e.target === e.currentTarget && close()}
+    >
+      <section className="account-panel" role="dialog" aria-modal="true" aria-labelledby="account-title">
+        <div className="account-panel-heading">
+          <div>
+            <span className="eyebrow teal">USER ACCOUNT</span>
+            <h2 id="account-title">Account settings</h2>
+            <p>Signed in as {session.username}</p>
+          </div>
+          <button className="account-close" aria-label="Close account settings" onClick={close}>
+            ×
+          </button>
+        </div>
+        {(panelError || message) && (
+          <div className={panelError ? 'error' : 'account-success'} role="status">
+            {panelError || message}
+          </div>
+        )}
+        <form
+          className="account-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void run(async () => {
+              await api('/api/account/password', 'POST', { currentPassword, newPassword });
+              setCurrentPassword('');
+              setNewPassword('');
+              setMessage('Password updated. Other sessions for this account were signed out.');
+            });
+          }}
+        >
+          <h3>Change my password</h3>
+          <label>
+            Current password
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              required
+            />
+          </label>
+          <label>
+            New password
+            <input
+              type="password"
+              autoComplete="new-password"
+              minLength={12}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              required
+            />
+          </label>
+          <button className="outline" disabled={busy}>
+            Update password
+          </button>
+        </form>
+        {session.isAdmin && (
+          <div className="account-admin">
+            <div className="account-section-heading">
+              <div>
+                <h3>Workspace accounts</h3>
+                <p>Add a separate login for each operator.</p>
+              </div>
+              <span>
+                {accounts.length} account{accounts.length === 1 ? '' : 's'}
+              </span>
+            </div>
+            <div className="account-list">
+              {accounts.map((account) => (
+                <div className="account-row" key={account.username}>
+                  <span className="avatar" aria-hidden="true">
+                    {account.username[0].toUpperCase()}
+                  </span>
+                  <div>
+                    <strong>{account.username}</strong>
+                    <small>{account.isAdmin ? 'Administrator' : 'Operator'}</small>
+                  </div>
+                  {account.username.toLowerCase() !== session.username.toLowerCase() && (
+                    <button
+                      className="account-remove"
+                      disabled={busy}
+                      onClick={() => {
+                        if (
+                          !window.confirm(
+                            `Remove ${account.username}? This will sign that account out everywhere.`,
+                          )
+                        )
+                          return;
+                        void run(async () => {
+                          await api('/api/accounts/' + encodeURIComponent(account.username), 'DELETE');
+                          loadAccounts();
+                          setMessage(`${account.username} was removed.`);
+                        });
+                      }}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <form
+              className="account-form account-create"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void run(async () => {
+                  await api('/api/accounts', 'POST', { username: newUsername, password: newUserPassword });
+                  setNewUsername('');
+                  setNewUserPassword('');
+                  loadAccounts();
+                  setMessage('Operator account created.');
+                });
+              }}
+            >
+              <h3>Add operator</h3>
+              <label>
+                Username
+                <input
+                  autoComplete="off"
+                  minLength={3}
+                  maxLength={32}
+                  value={newUsername}
+                  onChange={(e) => setNewUsername(e.target.value)}
+                  required
+                />
+              </label>
+              <label>
+                Temporary password
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={12}
+                  value={newUserPassword}
+                  onChange={(e) => setNewUserPassword(e.target.value)}
+                  required
+                />
+              </label>
+              <button className="primary" disabled={busy}>
+                Create account
+              </button>
+            </form>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
 function App() {
-  const [session, setSession] = useState<{
-      username: string;
-      limits: { files: number; fileMb: number; batchMb: number };
-    } | null>(null),
+  const [session, setSession] = useState<Session | null>(null),
     [checking, setChecking] = useState(true),
     [files, setFiles] = useState<File[]>([]),
     [job, setJob] = useState<Job | null>(null),
@@ -116,7 +302,8 @@ function App() {
     [password, setPassword] = useState(''),
     [username, setUsername] = useState('pilot'),
     [loginBusy, setLoginBusy] = useState(false),
-    [retryBusy, setRetryBusy] = useState(false);
+    [retryBusy, setRetryBusy] = useState(false),
+    [accountOpen, setAccountOpen] = useState(false);
   useEffect(() => {
     api('/api/session')
       .then(setSession)
@@ -150,7 +337,7 @@ function App() {
           if (live) {
             setError(
               e.status === 401
-                ? 'Your session expired. Sign in again to resume viewing this batch.'
+                ? 'Your sign-in is no longer valid. Sign in again to resume viewing this batch.'
                 : e.message,
             );
             if (e.status === 401) setSession(null);
@@ -306,9 +493,16 @@ function App() {
         </nav>
         <div className="top-right">
           <span className="private-label">{session.username}</span>
-          <span className="avatar" aria-label={`Signed in as ${session.username}`}>
+          <button
+            className="avatar account-trigger"
+            aria-label={`Account settings for ${session.username}`}
+            onClick={() => setAccountOpen(true)}
+          >
             {session.username[0].toUpperCase()}
-          </span>
+          </button>
+          <button className="account-button" onClick={() => setAccountOpen(true)}>
+            Account
+          </button>
           <button
             className="signout"
             onClick={async () => {
@@ -384,6 +578,7 @@ function App() {
           }}
         />
       </main>
+      {accountOpen && <AccountPanel session={session} close={() => setAccountOpen(false)} />}
     </div>
   );
 }
