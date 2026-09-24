@@ -1,11 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './style.css';
-import companyLogo from './assets/sugihara-logo.png';
+import companyMark from './assets/sugihara-mark.png';
 import { Workflow } from './Workflow';
 
-function CompanyLogo() {
-  return <img className="company-logo" src={companyLogo} alt="Sugihara Grand Industries Sdn Bhd" />;
+function BrandLockup() {
+  return (
+    <span className="brand-lockup">
+      <img className="company-mark" src={companyMark} alt="Sugihara Grand Industries" />
+      <span className="brand-workspace">
+        <strong>Logistic Digital</strong>
+        <span className="brand-sub">Logistics document workspace</span>
+      </span>
+    </span>
+  );
 }
 
 function UnitMark() {
@@ -434,7 +442,7 @@ function App() {
     return (
       <div className="login-page">
         <div className="login-art">
-          <CompanyLogo />
+          <BrandLockup />
           <p className="eyebrow">OPERATIONS WORKSPACE</p>
           <h1>
             Less paperwork.
@@ -484,7 +492,7 @@ function App() {
     <div className="app">
       <header className="topbar">
         <a className="mobile-brand" href="/" aria-label="Logistic Digital home">
-          <CompanyLogo />
+          <BrandLockup />
         </a>
         <nav className="header-context" aria-label="Breadcrumb">
           <span>Workspace</span>
@@ -519,10 +527,7 @@ function App() {
       </header>
       <aside className="sidebar">
         <a className="brand" href="/" aria-label="Logistic Digital home">
-          <CompanyLogo />
-          <span className="brand-workspace">
-            Logistic Digital<span className="brand-sub">LOGISTICS DOCUMENT WORKSPACE</span>
-          </span>
+          <BrandLockup />
         </a>
         <p className="nav-label">WORKSPACE</p>
         <a className="nav-active" href="#workflow-upload">

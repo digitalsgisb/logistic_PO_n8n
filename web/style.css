@@ -793,12 +793,23 @@ svg {
   }
 }
 .brand {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 20px;
+  display: block;
   min-width: 0;
-  margin: 0 14px 38px;
+  margin: 0 6px 38px;
+}
+.brand-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  max-width: 100%;
+}
+.company-mark {
+  display: block;
+  width: 52px;
+  height: 52px;
+  flex: 0 0 52px;
+  object-fit: contain;
 }
 .mobile-brand {
   display: none;
@@ -818,22 +829,23 @@ svg {
 .header-context strong {
   font-weight: 650;
 }
-.company-logo {
-  display: block;
-  width: 180px;
-  height: auto;
-  object-fit: contain;
-}
 .brand-workspace {
-  font-size: 22px;
-  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+.brand-workspace strong {
+  font-size: 17px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 .brand-sub {
   display: block;
-  font-size: 9px;
-  letter-spacing: 1.9px;
-  margin-top: 5px;
-  font-weight: 500;
+  font-size: 10.5px;
+  letter-spacing: 0;
+  margin-top: 4px;
+  font-weight: 400;
   color: #ccd9ec;
 }
 .top-right {
@@ -1683,8 +1695,16 @@ h3 {
   justify-content: center;
   align-items: flex-start;
 }
-.login-art .company-logo {
-  width: min(100%, 240px);
+.login-art .company-mark {
+  width: 62px;
+  height: 62px;
+  flex-basis: 62px;
+}
+.login-art .brand-workspace strong {
+  font-size: 22px;
+}
+.login-art .brand-sub {
+  font-size: 12px;
 }
 .login-art > .eyebrow {
   margin-top: 70px;
@@ -1828,24 +1848,27 @@ h3 {
     padding: 0 24px;
   }
   .mobile-brand {
-    display: block;
+    display: inline-flex;
     background: var(--dark);
     border-radius: 8px;
-    padding: 6px 10px;
+    padding: 5px 12px 5px 7px;
   }
-  .mobile-brand .company-logo {
-    width: 140px;
+  .mobile-brand .brand-lockup {
+    gap: 9px;
+  }
+  .mobile-brand .company-mark {
+    width: 38px;
+    height: 38px;
+    flex-basis: 38px;
+  }
+  .mobile-brand .brand-workspace strong {
+    font-size: 14px;
+  }
+  .mobile-brand .brand-sub {
+    font-size: 9px;
   }
   .header-context {
-    margin-right: auto;
-    margin-left: 22px;
-  }
-  .header-context > span,
-  .header-context svg {
     display: none;
-  }
-  .company-logo {
-    width: 170px;
   }
   .mobile-unit-mark {
     display: block;
@@ -1870,11 +1893,13 @@ h3 {
   .topbar {
     padding: 0 18px;
   }
-  .header-context {
+  .mobile-brand .brand-sub {
     display: none;
   }
-  .company-logo {
-    width: 160px;
+  .mobile-brand .company-mark {
+    width: 32px;
+    height: 32px;
+    flex-basis: 32px;
   }
   .top-right {
     gap: 8px;
@@ -1974,9 +1999,10 @@ h3 {
   .login-art {
     padding: 24px 26px;
   }
-  .login-art .company-logo {
-    width: 200px;
-    max-width: 100%;
+  .login-art .company-mark {
+    width: 50px;
+    height: 50px;
+    flex-basis: 50px;
   }
   .login-art > .eyebrow,
   .login-art h1,
@@ -1995,8 +2021,8 @@ h3 {
   }
 }
 @media (max-width: 370px) {
-  .company-logo {
-    width: 150px;
+  .mobile-brand .brand-workspace strong {
+    font-size: 12px;
   }
   .topbar {
     padding: 0 14px;
