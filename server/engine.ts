@@ -187,7 +187,7 @@ export class Engine {
       job.results = results;
       job.state = orders.length ? (results.length ? 'partial' : 'completed') : 'failed';
       job.stage = orders.length
-        ? 'Evening orders saved for the next morning. No Excel download yet.'
+        ? 'Night orders saved for the next morning. No Excel download yet.'
         : 'Review required';
       job.error = undefined;
       this.store.save(job);
@@ -307,7 +307,7 @@ export class Engine {
     if (successes) {
       const displayDate = session.date.split('-').reverse().join('/');
       for (const previous of carriedEveningJobs) {
-        previous.stage = `Evening orders included in the morning Excel dated ${displayDate}.`;
+        previous.stage = `Night orders included in the morning Excel dated ${displayDate}.`;
         this.store.save(previous);
       }
     }
@@ -342,7 +342,7 @@ export function publicJob(job: Job) {
     id: job.id,
     dispatch_shift: job.dispatch_shift,
     state: job.state,
-    stage: job.stage,
+    stage: job.stage.replace(/^Evening orders/, 'Night orders'),
     created_at: job.created_at,
     error: job.error,
     progress: terminal

@@ -70,7 +70,7 @@ export function Workflow({
   }
   function start() {
     if (mode !== 'tags' && !dispatchShift) {
-      setLocalError('Choose Morning or Evening before processing your POs.');
+      setLocalError('Choose Morning or Night before processing your POs.');
       return;
     }
     setStarted(true);
@@ -244,8 +244,8 @@ export function Workflow({
             <p>Choose the batch you are handling. The choice does not depend on the time you upload.</p>
             <div role="group" aria-label="Order batch">
               {([
-                ['morning', 'Morning order', 'Create today’s Excel with saved evening orders.'],
-                ['evening', 'Evening order', 'Save these POs for the next morning. No Excel yet.'],
+                ['morning', 'Morning order', 'Create today’s Excel with saved night orders.'],
+                ['evening', 'Night order', 'Save these POs for the next morning. No Excel yet.'],
               ] as const).map(([value, title, description]) => (
                 <button
                   type="button"
@@ -301,20 +301,20 @@ export function Workflow({
                 Download all {ready.length} workbooks as ZIP ↓
               </a>
             )}
-            <p className="kanban-card-note">Dated to the morning upload · Includes saved evening orders · Previously dispatched POs are counted once · A4 landscape</p>
+            <p className="kanban-card-note">Dated to the morning upload · Includes saved night orders · Previously dispatched POs are counted once · A4 landscape</p>
           </section>
         )}
-        {done && !ready.length && job!.stage.startsWith('Evening orders saved') && (
+        {done && !ready.length && (job!.stage.startsWith('Night orders saved') || job!.stage.startsWith('Evening orders saved')) && (
           <div className="dispatch-waiting-note" role="status">
-            <strong>Evening orders saved</strong>
+            <strong>Night orders saved</strong>
             <p>No Excel download yet. The next morning upload will combine these orders into one Excel dated that morning.</p>
             <p>You can review and print rack tags now.</p>
           </div>
         )}
-        {done && !ready.length && job!.stage.startsWith('Evening orders included') && (
+        {done && !ready.length && (job!.stage.startsWith('Night orders included') || job!.stage.startsWith('Evening orders included')) && (
           <div className="dispatch-waiting-note" role="status">
             <strong>Included in the morning Excel</strong>
-            <p>{job!.stage} Open the morning batch to download the combined Excel.</p>
+            <p>{job!.stage.replace(/^Evening orders/, 'Night orders')} Open the morning batch to download the combined Excel.</p>
           </div>
         )}
         {done && !ready.length && job!.stage.startsWith('These POs are already') && (

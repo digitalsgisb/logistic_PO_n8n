@@ -1171,13 +1171,6 @@ svg {
   color: #a4b5cf;
   font-size: 9px;
 }
-.sidebar-note p {
-  font-size: 21px;
-  line-height: 1.7;
-  font-weight: 400;
-  color: #e0e6f0;
-  margin: 16px 0;
-}
 .plant-tags {
   display: flex;
   flex-wrap: wrap;

@@ -4,11 +4,11 @@ Verified on 4 September 2026 with Node 24.12.0 on Windows.
 
 ## Completed checks
 
-### Morning dispatch and evening carryover — 28 September 2026
+### Morning dispatch and night carryover — 28 September 2026
 
-- The operator must choose Morning order or Evening order before a PO upload; the choice is saved with the batch and does not depend on upload time. Morning creates one workbook dated with the upload's Malaysia calendar date. Evening saves validated orders without an Excel download; tagging review and printing remain available.
-- The next morning upload combines its orders with retained evening orders since the previous morning, including Friday evening to Monday morning. Repeated POs are counted once. Mixed source delivery dates can share that morning's workbook while each PO's source date and sequence remain validated.
-- The regression tests cover the required manual choice, a morning choice after 5:00 pm, an evening choice before 5:00 pm, the waiting state, Friday-to-Monday carryover, workbook date, and Excel Remarks. No live n8n extraction or physical printing was performed in this check.
+- The operator must choose Morning order or Night order before a PO upload; the choice is saved with the batch and does not depend on upload time. Morning creates one workbook dated with the upload's Malaysia calendar date. Night saves validated orders without an Excel download; tagging review and printing remain available.
+- The next morning upload combines its orders with retained night orders since the previous morning, including Friday night to Monday morning. Repeated POs are counted once. Mixed source delivery dates can share that morning's workbook while each PO's source date and sequence remain validated.
+- The regression tests cover the required manual choice, a morning choice after 5:00 pm, a night choice before 5:00 pm, the waiting state, Friday-to-Monday carryover, workbook date, and Excel Remarks. No live n8n extraction or physical printing was performed in this check.
 
 ### Clear Excel downloads and smoother motion — 7 September 2026
 

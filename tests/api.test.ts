@@ -179,7 +179,7 @@ test('authenticated upload → n8n callbacks → one combined download; duplicat
       payload: form.payload,
     });
     assert.equal(withoutShift.statusCode, 400);
-    assert.match(withoutShift.body, /Choose Morning or Evening/);
+    assert.match(withoutShift.body, /Choose Morning or Night/);
     const upload = await app.inject({
       method: 'POST',
       url: '/api/jobs',

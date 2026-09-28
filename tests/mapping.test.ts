@@ -320,7 +320,7 @@ test('a later trip workbook includes validated orders from an earlier batch once
     await fs.rm(dir, { recursive: true, force: true });
   }
 });
-test('Friday evening waits, then joins Monday morning under Monday upload date', async () => {
+test('Friday night waits, then joins Monday morning under Monday upload date', async () => {
   assert.deepEqual(dispatchSession('2026-09-25T10:00:00Z', 'morning'), { date: '2026-09-25', shift: 'morning' });
   assert.deepEqual(dispatchSession('2026-09-25T01:00:00Z', 'evening'), { date: '2026-09-25', shift: 'evening' });
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'toyota-shifts-'));
@@ -355,7 +355,7 @@ test('Friday evening waits, then joins Monday morning under Monday upload date',
     assert.equal(monday.state, 'completed');
     assert.equal(ready.date, '2026-09-28');
     assert.equal(ready.order_count, 2);
-    assert.match(store.get('friday-evening')!.stage, /included in the morning Excel dated 28\/09\/2026/);
+    assert.match(store.get('friday-evening')!.stage, /Night orders included in the morning Excel dated 28\/09\/2026/);
     assert.deepEqual(ready.order_numbers, ['SGIS12DA3252-SA', 'SGIS12DA3251-SA']);
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(ready.path!);

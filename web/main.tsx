@@ -544,11 +544,6 @@ function App() {
         <div className="sidebar-note">
           <div className="side-rule" />
           <span className="eyebrow">LOGISTIC DIGITAL</span>
-          <p>
-            A simpler way to
-            <br />
-            prepare your orders.
-          </p>
           <div className="plant-tags">
             <span>Shah Alam</span>
             <span>Bukit Raja</span>
