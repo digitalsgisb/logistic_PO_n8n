@@ -4,10 +4,13 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import ExcelJS from 'exceljs';
-import { assemble, destination, kbNumber, validatePage, headers } from '../server/mapping.ts';
+import { assemble, destination, kbNumber, validatePage, headers, sourceItems, sourceDeliveryDate, isZeroOrder } from '../server/mapping.ts';
 import { batchFilename, ordersByDate, writeBatch } from '../server/workbook.ts';
 import { readPdf } from '../server/pdf.ts';
 import { orders, pageFor, pdfFor, textFor } from './helpers.ts';
+import { Store } from '../server/store.ts';
+import { Engine } from '../server/engine.ts';
+import { config } from '../server/config.ts';
 
 test('four sample orders produce one daily sheet with nine quantities and PO numbers in Remarks', async () => {
   const pages = orders.map((o, i) => ({ ...pageFor(o, String(i)), number: i + 1 }));
@@ -267,6 +270,54 @@ test('validate quantity arithmetic, source row relationships, and TOTAL', () => 
   const r = pageFor();
   r.text = r.text.replace('TOTAL 3', 'TOTAL 4');
   assert.throws(() => validatePage(r.extraction, r), /TOTAL/);
+});
+test('printed item rows and delivery sequence handle a separate pickup date', () => {
+  const p = pageFor(orders[3]);
+  p.text = p.text.replace('03/09/2026 11:15', '03/09/2026 11:15 01/09/2026 02:20');
+  p.text = p.text.replace('58510-0A300-C0 56C3 PACK 30 1 30', '58510-0A300-C0 56C3 BF- H02 30 1 30');
+  assert.equal(validatePage(p.extraction, p).delivery_date, '2026-09-03');
+  assert.equal(sourceDeliveryDate(p.text), '2026-09-03');
+  assert.deepEqual(sourceItems(p.text), orders[3].items);
+});
+test('a printed zero order is omitted from review and output', () => {
+  const p = pageFor();
+  p.text = 'ASSB BKT RAJA\n2026092801 1/1\nTOTAL 0\nZERO ORDER';
+  p.extraction = undefined;
+  p.error = 'AI returned invalid structured output';
+  assert.equal(isZeroOrder(p.text), true);
+  assert.deepEqual(assemble([p]), { orders: [], errors: [] });
+});
+test('a later trip workbook includes validated orders from an earlier batch once', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'toyota-cumulative-'));
+  const store = new Store(dir);
+  try {
+    const first = pageFor(orders[0], 'first');
+    const second = pageFor(orders[2], 'second');
+    second.state = 'extracting';
+    second.extraction = undefined;
+    const base = { stage: 'test', attempt: 'test', created_at: '2026-09-03T00:00:00Z', updated_at: '2026-09-03T00:00:00Z', files: [], results: [] };
+    store.save({ ...base, id: 'earlier', state: 'completed', pages: [first] });
+    const current = store.save({ ...base, id: 'latest', state: 'processing', pages: [first, second] });
+    await fs.mkdir(path.join(dir, 'latest'));
+    const engine = new Engine(store, { ...config, dataDir: dir });
+    const misread = structuredClone(orders[2]);
+    misread.delivery_date = '2026-09-04';
+    misread.items[0].total_quantity = 30;
+    engine.result(current.id, current.attempt, second.id, misread);
+    assert.equal(store.get('latest')!.pages[1].extraction!.delivery_date, '2026-09-03');
+    assert.deepEqual(store.get('latest')!.pages[1].extraction!.items, orders[2].items);
+    await engine.finish(store.get('latest')!);
+    const ready = store.get('latest')!.results.find((result) => result.status === 'ready')!;
+    assert.equal(ready.order_count, 2);
+    assert.deepEqual(ready.order_numbers, ['SGIS12AA0747-SA', 'SGIS12DA3252-SA']);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(ready.path!);
+    assert.equal(workbook.worksheets[0].getCell('V13').value, 1200);
+    assert.equal(workbook.worksheets[0].getCell('AE16').value, 'SGIS12DA3252-SA');
+  } finally {
+    store.close();
+    await fs.rm(dir, { recursive: true, force: true });
+  }
 });
 test('identical pages deduplicate but conflicting versions require review', () => {
   const p = pageFor(),

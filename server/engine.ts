@@ -4,9 +4,9 @@ import { randomUUID } from 'node:crypto';
 import { Store } from './store.ts';
 import { config } from './config.ts';
 import { readPdf } from './pdf.ts';
-import { assemble, hash } from './mapping.ts';
+import { assemble, hash, sourceDeliveryDate, sourceItems } from './mapping.ts';
 import { batchFilename, ordersByDate, writeBatch } from './workbook.ts';
-import type { Job, Extraction } from './types.ts';
+import type { Job, Extraction, Order } from './types.ts';
 const running = new Set(['reading', 'processing', 'generating']);
 export class Engine {
   busy = false;
@@ -140,7 +140,16 @@ export class Engine {
       const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
         throw new Error('AI returned invalid structured output.');
-      page.extraction = parsed as Extraction;
+      const extraction = parsed as Extraction;
+      // These rows have a fixed, printed layout. Use the source text when every
+      // row and the printed TOTAL reconcile, instead of a model's misread digits.
+      const printedItems = sourceItems(page.text);
+      const printedDate = sourceDeliveryDate(page.text);
+      page.extraction = {
+        ...extraction,
+        items: printedItems ?? extraction.items,
+        delivery_date: printedDate ?? extraction.delivery_date,
+      };
       page.state = 'extracted';
       page.error = undefined;
     } catch (e) {
@@ -172,7 +181,33 @@ export class Engine {
           error: file.error,
           sources: [file.filename],
         });
-    for (const [date, dailyOrders] of ordersByDate(orders)) {
+    const byIdentity = new Map<string, Order>();
+    const priorJobs = this.store.all()
+      .filter((previous) => previous.id !== job.id && ['completed', 'partial'].includes(previous.state))
+      .sort((a, b) => a.created_at.localeCompare(b.created_at));
+    const signature = (order: Order) => JSON.stringify({
+      date: order.delivery_date, sequence: order.delivery_sequence, route: order.route,
+      items: order.items, page_count: order.page_count,
+    });
+    for (const previous of priorJobs)
+      for (const order of assemble(previous.pages).orders)
+        byIdentity.set(`${order.source_order_id}|${order.destination}`, order);
+    for (const order of orders) {
+      const key = `${order.source_order_id}|${order.destination}`;
+      const prior = byIdentity.get(key);
+      if (prior && signature(prior) !== signature(order))
+        results.push({
+          id: `changed-${hash(key).slice(0, 16)}`,
+          order_id: order.source_order_id,
+          status: 'review',
+          error: 'This PO differs from an earlier upload. The latest version is used in the new workbook; verify the change.',
+          sources: order.source_pages,
+        });
+      byIdentity.set(key, order);
+    }
+    const currentDates = new Set(orders.map((order) => order.delivery_date));
+    const combined = [...byIdentity.values()].filter((order) => currentDates.has(order.delivery_date));
+    for (const [date, dailyOrders] of ordersByDate(combined)) {
       const id = `date-${date}`;
       const filename = batchFilename(dailyOrders),
         out = path.join(this.options.dataDir, job.id, filename),

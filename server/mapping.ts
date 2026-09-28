@@ -1,4 +1,4 @@
-import type { Destination, Extraction, Order, Page, Result } from './types.ts';
+import type { Destination, Extraction, LineItem, Order, Page, Result } from './types.ts';
 import { createHash } from 'node:crypto';
 import { taggingIdentity } from './taggingIdentity.ts';
 
@@ -39,6 +39,27 @@ export const headers: Record<string, { column: number; destination: Destination 
   ].map((code, i) => [code, { column: i + 4, destination: i < 18 ? 'BUKIT RAJA' : 'SHAH ALAM' }]),
 );
 export const hash = (s: string | Uint8Array) => createHash('sha256').update(s).digest('hex');
+export function isZeroOrder(text: string) {
+  return /\bZERO ORDER\b/i.test(text) && /\bTOTAL\s+0\b/.test(text) && sourceOrderIds(text).length === 0;
+}
+export function sourceItems(text: string): LineItem[] | undefined {
+  const lines = text.split('\n').filter((line) => /\b[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{2}\b/.test(line));
+  if (!lines.length) return undefined;
+  const items: LineItem[] = [];
+  for (const line of lines) {
+    const match = line.trim().match(/^([A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{2})\s+([A-Z0-9]{3,4})\s+.+?\s+(\d+)\s+(\d+)\s+(\d+)$/);
+    if (!match) return undefined;
+    const [, part_number, item_code, pack, kanbans, total] = match;
+    const pack_size = Number(pack), kanban_count = Number(kanbans), total_quantity = Number(total);
+    if (!headers[item_code] || ![pack_size, kanban_count, total_quantity].every(Number.isSafeInteger) ||
+        pack_size <= 0 || kanban_count <= 0 || total_quantity <= 0 ||
+        pack_size * kanban_count !== total_quantity) return undefined;
+    items.push({ part_number, item_code, pack_size, kanban_count, total_quantity });
+  }
+  const printed = text.match(/\bTOTAL\s+(\d+)\b/);
+  return printed && Number(printed[1]) === items.reduce((sum, item) => sum + item.kanban_count, 0)
+    ? items : undefined;
+}
 export function destination(value: string): Destination {
   const text = String(value).toUpperCase();
   const sa = /SHAH\s+ALAM/.test(text),
@@ -55,6 +76,18 @@ export function isoDate(value: string) {
   if (!match || new Date(value + 'T00:00:00Z').toISOString().slice(0, 10) !== value)
     throw new Error('Invalid delivery date.');
   return value;
+}
+export function sourceDeliveryDate(text: string) {
+  const sequences = [...new Set(text.match(/\b20\d{8}\b/g) ?? [])];
+  if (sequences.length !== 1) return undefined;
+  const value = `${sequences[0].slice(0, 4)}-${sequences[0].slice(4, 6)}-${sequences[0].slice(6, 8)}`;
+  try {
+    isoDate(value);
+  } catch {
+    return undefined;
+  }
+  const [year, month, day] = value.split('-');
+  return new RegExp(`\\b${day}/${month}/(?:${year}|${year.slice(2)})\\b`).test(text) ? value : undefined;
 }
 function deliverySequence(text: string, date: string) {
   // The printed YYYYMMDDNN sequence is authoritative; route suffixes are unrelated.
@@ -90,8 +123,11 @@ export function validatePage(raw: unknown, page: Page): Order {
   const sourceDates = [...page.text.matchAll(/\b(\d{2})\/(\d{2})\/(\d{4}|\d{2})\b/g)].map(
     (t) => `${t[3].length === 2 ? '20' + t[3] : t[3]}-${t[2]}-${t[1]}`,
   );
-  if (!sourceDates.includes(`${y}-${m}-${d}`) || new Set(sourceDates).size !== 1)
-    throw new Error('Delivery date is missing or ambiguous in the source.');
+  // A pickup date may differ from the arrival/delivery date. The printed
+  // delivery sequence below disambiguates them; the selected date must still
+  // appear in a normal date field on the page.
+  if (!sourceDates.includes(`${y}-${m}-${d}`))
+    throw new Error('Delivery date is missing in the source.');
   const { sequence, trip } = deliverySequence(page.text, date);
   // Page markers must be isolated (dates are excluded).
   const marker = page.text
@@ -157,6 +193,7 @@ export function validatePage(raw: unknown, page: Page): Order {
 export function assemble(pages: Page[]): { orders: Order[]; errors: Result[] } {
   const groups = new Map<string, Page[]>();
   for (const page of pages) {
+    if (isZeroOrder(page.text)) continue;
     const ids = sourceOrderIds(page.text);
     // Include failed pages in the group, so an incomplete order cannot be released.
     let place = 'UNKNOWN';

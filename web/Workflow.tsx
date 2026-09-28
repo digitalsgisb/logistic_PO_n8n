@@ -270,7 +270,7 @@ export function Workflow({
                 Download all {ready.length} workbooks as ZIP ↓
               </a>
             )}
-            <p className="kanban-card-note">One workbook per delivery date · A4 landscape</p>
+            <p className="kanban-card-note">One workbook per delivery date · Includes earlier retained uploads for that date · A4 landscape</p>
           </section>
         )}
         {!active ? (

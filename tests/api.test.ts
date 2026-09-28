@@ -302,9 +302,11 @@ test('authenticated upload → n8n callbacks → one combined download; duplicat
     }
     await engine.claim(datedId, datedAttempt);
     const datedStatus = (await app.inject({ url: `/api/jobs/${datedId}`, headers })).json();
-    assert.equal(datedStatus.state, 'completed');
-    assert.equal(datedStatus.results.length, 2);
-    for (const [index, result] of datedStatus.results.entries()) {
+    assert.equal(datedStatus.state, 'partial');
+    assert.equal(datedStatus.results.filter((result: { status: string }) => result.status === 'review').length, 2);
+    const datedReady = datedStatus.results.filter((result: { status: string }) => result.status === 'ready');
+    assert.equal(datedReady.length, 2);
+    for (const [index, result] of datedReady.entries()) {
       assert.equal(result.date, index === 0 ? '2026-09-03' : '2026-09-04');
       assert.equal(result.order_count, 2);
       assert.deepEqual(

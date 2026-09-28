@@ -2,7 +2,7 @@
 
 An internal Toyota order converter: upload PDF purchase orders, extract them with local Ollama through n8n, and download one combined kanban workbook per delivery date.
 
-The interface uses a compact Sugihara Grand Industries logo, Digital Transformation Unit branding, and a dark-blue palette with a subtle animated gradient. The header and desktop sidebar stay fixed while content scrolls. Animation respects reduced-motion preferences. PO numbers go in Remarks beside their trip: `SGIS12AA0747-SA` for Shah Alam and `SGIS13FA5002-BR` for Bukit Raja. Original order IDs are retained separately for source validation. Orders for the same delivery date share one Excel file, even across different PDFs. A PDF or batch containing two delivery dates produces two files, each with one daily sheet. Download them individually or together as a ZIP.
+The interface uses a compact Sugihara Grand Industries logo, Digital Transformation Unit branding, and a dark-blue palette with a subtle animated gradient. The header and desktop sidebar stay fixed while content scrolls. Animation respects reduced-motion preferences. PO numbers go in Remarks beside their trip: `SGIS12AA0747-SA` for Shah Alam and `SGIS13FA5002-BR` for Bukit Raja. Original order IDs are retained separately for source validation. Orders for the same delivery date share one Excel file, even across different PDFs and retained uploads. A later trip upload includes earlier validated orders for that delivery date, with repeated POs counted once. A PDF or batch containing two delivery dates produces two files, each with one daily sheet. Download them individually or together as a ZIP.
 
 ## Rack tagging and Windows printing
 
@@ -150,9 +150,16 @@ Outputs go to `outputs/combined-live-sample/`. Without `--live`, the sample scri
 - Suffixed PO numbers appear once per order in column AE (Remarks), within that trip's three rows, in bold 20-point text. Wrapped Remarks rows expand when needed. KB NO, DO.NO, ETA, and outstanding cells remain blank.
 - Matching stars are assigned separately within each delivery date, trip, and destination. A destination with only one PO has no marker. With multiple POs, one base PO stays unmarked and the others use `*`, `**`, etc. HOOK (HU83, shown as 1200 in the sample) receives the first star when paired with a non-HOOK PO. PO-number ordering makes assignments independent of upload order. Shared quantities list contributing nonempty labels below the total; quantity cells remain numeric for calculations.
 - Every generated daily sheet uses A4 landscape with the template print area fitted to one page wide and one page tall. Pull and rebuild the API (`docker compose up -d --build`), then start a new batch to apply these settings and star labels to downloads.
-- The header date comes from the source delivery date. Each date gets a separate `Toyota_YYYY-MM-DD_Combined.xlsx` file containing the `ASSB2016` daily sheet. Other dates appearing on the PDF do not create extra outputs.
+- The header date comes from the source delivery sequence and arrival/delivery date, even when the pickup date differs. Each date gets a separate `Toyota_YYYY-MM-DD_Combined.xlsx` file containing the `ASSB2016` daily sheet. A new upload's file includes validated orders from earlier retained batches for the same date. Other dates appearing on the PDF do not create extra outputs.
 - Repeated order pages are deduplicated; missing pages and conflicting versions require review. Source orders remain separate in extraction records. Within one order, repeated matching items are summed only when part and pack details agree.
 - Matching source identifiers and numeric values is mandatory. Unknown destinations/codes/routes, ambiguous dates, missing items, and quantity discrepancies do not produce a ready workbook.
+
+### Editing the Excel template yourself
+
+1. Copy `templates/toyota.xlsx` as a backup. Open `templates/toyota.xlsx` in Microsoft Excel and edit the `ASSB2016` sheet. Save as `.xlsx` in the same location; keep the worksheet name.
+2. For visual changes, edit colours, borders, fills, static labels, column widths, and row heights. Keep the item-code headings in row 8 and their columns D–AD; the converter checks them before writing. Keep the trip layout at rows 13, 16, 19, and every three rows through row 40, and the Remarks cells in column AE.
+3. Leave generated cells blank in the template: date `F4`, trip quantity cells, and Remarks `AE13:AE42`. The converter writes those values for each new file. It also sets A4 landscape, print area `A4:AE42`, fit to one page, and some font sizes, so edit `server/workbook.ts` if you need those settings to change.
+4. Run `node node_modules/typescript/bin/tsc --noEmit` and `node --import tsx --test tests/mapping.test.ts`, then generate a fresh workbook and check it in Excel's Print Preview. Rebuild the deployed API for a template change (`docker compose up -d --build api`); existing downloads stay as generated.
 
 ### Rebuilding the legacy template
 
