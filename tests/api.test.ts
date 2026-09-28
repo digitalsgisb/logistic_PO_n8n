@@ -9,6 +9,7 @@ import ExcelJS from 'exceljs';
 import JSZip from 'jszip';
 import { buildApp } from '../server/app.ts';
 import { config } from '../server/config.ts';
+import { dispatchSession } from '../server/dispatch.ts';
 import { orders, pdfFor, textFor } from './helpers.ts';
 
 function multipart(files: { name: string; bytes: Buffer }[]) {
@@ -145,6 +146,8 @@ test('authenticated upload → n8n callbacks → one combined download; duplicat
   };
   const { app, engine, store } = await buildApp(options);
   try {
+    const uploadDate = dispatchSession(new Date().toISOString()).date;
+    const displayDate = uploadDate.split('-').reverse().join('/');
     assert.equal((await app.inject({ url: '/api/session' })).statusCode, 401);
     assert.equal(
       (
@@ -164,12 +167,19 @@ test('authenticated upload → n8n callbacks → one combined download; duplicat
     });
     assert.equal(login.statusCode, 200);
     const cookie = String(login.headers['set-cookie']).split(';')[0];
-    const headers = { cookie, 'x-requested-with': 'ToyotaPO' };
+    const headers = { cookie, 'x-requested-with': 'ToyotaPO', 'x-dispatch-shift': 'morning' };
     const bytes = pdfFor(orders.map(textFor)),
       form = multipart([
         { name: 'orders.pdf', bytes },
         { name: 'duplicate.pdf', bytes },
       ]);
+    const withoutShift = await app.inject({
+      method: 'POST', url: '/api/jobs',
+      headers: { cookie, 'x-requested-with': 'ToyotaPO', 'content-type': form.type },
+      payload: form.payload,
+    });
+    assert.equal(withoutShift.statusCode, 400);
+    assert.match(withoutShift.body, /Choose Morning or Evening/);
     const upload = await app.inject({
       method: 'POST',
       url: '/api/jobs',
@@ -177,10 +187,14 @@ test('authenticated upload → n8n callbacks → one combined download; duplicat
       payload: form.payload,
     });
     assert.equal(upload.statusCode, 202, upload.body);
+    assert.equal(upload.json().dispatch_shift, 'morning');
     const id = upload.json().id;
     assert.equal(upload.json().files[1].duplicate, true);
     assert.ok(!upload.body.includes(dir));
     await engine.tick();
+    const firstJob = store.get(id)!;
+    firstJob.created_at = `${uploadDate}T00:00:00Z`;
+    store.save(firstJob);
     const attempt = store.get(id)!.attempt;
     const internal = { 'x-service-secret': options.serviceSecret };
     assert.equal(
@@ -250,7 +264,7 @@ test('authenticated upload → n8n callbacks → one combined download; duplicat
     assert.equal(downloaded.worksheets[0].getCell('H19').value, null);
     const zip = await app.inject({ url: `/api/jobs/${id}/download-all`, headers });
     assert.equal(zip.statusCode, 200);
-    assert.ok(zip.rawPayload.includes(Buffer.from('Toyota_2026-09-03_Combined.xlsx')));
+    assert.ok(zip.rawPayload.includes(Buffer.from(`Toyota_${uploadDate}_Combined.xlsx`)));
     assert.equal(
       (
         await app.inject({
@@ -293,6 +307,9 @@ test('authenticated upload → n8n callbacks → one combined download; duplicat
     assert.equal(datedUpload.statusCode, 202, datedUpload.body);
     const datedId = datedUpload.json().id;
     await engine.tick();
+    const secondJob = store.get(datedId)!;
+    secondJob.created_at = `${uploadDate}T01:00:00Z`;
+    store.save(secondJob);
     const datedAttempt = store.get(datedId)!.attempt;
     for (const order of datedOrders) {
       const claimed = await engine.claim(datedId, datedAttempt);
@@ -305,13 +322,13 @@ test('authenticated upload → n8n callbacks → one combined download; duplicat
     assert.equal(datedStatus.state, 'partial');
     assert.equal(datedStatus.results.filter((result: { status: string }) => result.status === 'review').length, 2);
     const datedReady = datedStatus.results.filter((result: { status: string }) => result.status === 'ready');
-    assert.equal(datedReady.length, 2);
-    for (const [index, result] of datedReady.entries()) {
-      assert.equal(result.date, index === 0 ? '2026-09-03' : '2026-09-04');
-      assert.equal(result.order_count, 2);
+    assert.equal(datedReady.length, 1);
+    for (const result of datedReady) {
+      assert.equal(result.date, uploadDate);
+      assert.equal(result.order_count, 4);
       assert.deepEqual(
         result.order_numbers,
-        index === 0 ? ['SGIS12AA0747-SA', 'SGIS12DA3251-SA'] : ['SGIS12DA3252-SA', 'SGIS13FA5002-BR'],
+        ['SGIS12AA0747-SA', 'SGIS12DA3251-SA', 'SGIS12DA3252-SA', 'SGIS13FA5002-BR'],
       );
       const dailyDownload = await app.inject({ url: `/api/jobs/${datedId}/outputs/${result.id}`, headers });
       assert.equal(dailyDownload.statusCode, 200);
@@ -320,17 +337,16 @@ test('authenticated upload → n8n callbacks → one combined download; duplicat
       assert.equal(daily.worksheets.length, 1);
       assert.equal(
         daily.worksheets[0].getCell('F4').value,
-        index === 0 ? 'DATE : 03/09/2026' : 'DATE : 04/09/2026',
+        `DATE : ${displayDate}`,
       );
-      assert.equal(daily.worksheets[0].getCell('V13').value, index === 0 ? 1200 : null);
-      assert.equal(daily.worksheets[0].getCell('H16').value, index === 0 ? null : 30);
+      assert.equal(daily.worksheets[0].getCell('V13').value, 1200);
+      assert.equal(daily.worksheets[0].getCell('H16').value, 30);
     }
     const dailyZip = await app.inject({ url: `/api/jobs/${datedId}/download-all`, headers });
     assert.equal(dailyZip.statusCode, 200);
     const archive = await JSZip.loadAsync(dailyZip.rawPayload);
     assert.deepEqual(Object.keys(archive.files).sort(), [
-      'Toyota_2026-09-03_Combined.xlsx',
-      'Toyota_2026-09-04_Combined.xlsx',
+      `Toyota_${uploadDate}_Combined.xlsx`,
     ]);
     assert.equal(
       (

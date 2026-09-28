@@ -42,6 +42,7 @@ type Result = {
 };
 type Job = {
   id: string;
+  dispatch_shift?: 'morning' | 'evening';
   state: string;
   stage: string;
   progress: number;
@@ -383,7 +384,7 @@ function App() {
     }
     setFiles(next);
   };
-  const submit = () => {
+  const submit = (dispatchShift: 'morning' | 'evening') => {
     if (!files.length || busy) return;
     setError('');
     setUpload(0);
@@ -392,6 +393,7 @@ function App() {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/api/jobs');
     xhr.setRequestHeader('X-Requested-With', 'ToyotaPO');
+    xhr.setRequestHeader('X-Dispatch-Shift', dispatchShift);
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) setUpload(Math.round((e.loaded / e.total) * 100));
     };

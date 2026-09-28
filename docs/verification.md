@@ -4,6 +4,12 @@ Verified on 4 September 2026 with Node 24.12.0 on Windows.
 
 ## Completed checks
 
+### Morning dispatch and evening carryover — 28 September 2026
+
+- The operator must choose Morning order or Evening order before a PO upload; the choice is saved with the batch and does not depend on upload time. Morning creates one workbook dated with the upload's Malaysia calendar date. Evening saves validated orders without an Excel download; tagging review and printing remain available.
+- The next morning upload combines its orders with retained evening orders since the previous morning, including Friday evening to Monday morning. Repeated POs are counted once. Mixed source delivery dates can share that morning's workbook while each PO's source date and sequence remain validated.
+- The regression tests cover the required manual choice, a morning choice after 5:00 pm, an evening choice before 5:00 pm, the waiting state, Friday-to-Monday carryover, workbook date, and Excel Remarks. No live n8n extraction or physical printing was performed in this check.
+
 ### Clear Excel downloads and smoother motion — 7 September 2026
 
 - Added a shared green Excel download button with a spreadsheet icon, explicit action label, date/order context and separate ZIP wording. Added gentle section entry, hover transitions and progressive details-height animation, with reduced-motion overrides.
@@ -32,7 +38,7 @@ Verified on 4 September 2026 with Node 24.12.0 on Windows.
 - Edge browser checks used the real PDF: three source previews, disabled printing before review, explicit preparation, fourteen generated print pages, changing a count clears approval and the packet, mobile width 390 without overflow, and no page errors. Print-media rendering was inspected and contains only the original tag artwork. The print call was intercepted during testing; no physical print was sent or printer completion verified.
 - The new dark-blue palette retains motion preferences, fixed navigation, and company branding. Printer selection and settings are provided by the Windows browser print dialog. A local print agent and silent printing are not part of this implementation.
 
-### Separate output files by delivery date
+### Separate output files by delivery date (historical verification; superseded by morning dispatch grouping)
 
 - All 17 tests, TypeScript checking, and the production build passed. The API upload test covers a single PDF with four POs across two delivery dates, two separately downloadable Excel files containing only their respective orders, and a ZIP containing exactly those two files. The existing one-date PDF still produces one output, and restart/retry preserves successful quantities without duplication.
 - The writer rejects mixed-date input; the engine and sample generator group validated orders by delivery date before writing. Each output retains a single ASSB2016 sheet, A4 settings, and the destination-specific star rules. Ready outputs have date-specific IDs and filenames.

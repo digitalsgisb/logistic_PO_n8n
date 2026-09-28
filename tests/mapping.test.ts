@@ -11,6 +11,7 @@ import { orders, pageFor, pdfFor, textFor } from './helpers.ts';
 import { Store } from '../server/store.ts';
 import { Engine } from '../server/engine.ts';
 import { config } from '../server/config.ts';
+import { dispatchSession } from '../server/dispatch.ts';
 
 test('four sample orders produce one daily sheet with nine quantities and PO numbers in Remarks', async () => {
   const pages = orders.map((o, i) => ({ ...pageFor(o, String(i)), number: i + 1 }));
@@ -295,7 +296,7 @@ test('a later trip workbook includes validated orders from an earlier batch once
     const second = pageFor(orders[2], 'second');
     second.state = 'extracting';
     second.extraction = undefined;
-    const base = { stage: 'test', attempt: 'test', created_at: '2026-09-03T00:00:00Z', updated_at: '2026-09-03T00:00:00Z', files: [], results: [] };
+    const base = { dispatch_shift: 'morning' as const, stage: 'test', attempt: 'test', created_at: '2026-09-03T00:00:00Z', updated_at: '2026-09-03T00:00:00Z', files: [], results: [] };
     store.save({ ...base, id: 'earlier', state: 'completed', pages: [first] });
     const current = store.save({ ...base, id: 'latest', state: 'processing', pages: [first, second] });
     await fs.mkdir(path.join(dir, 'latest'));
@@ -314,6 +315,59 @@ test('a later trip workbook includes validated orders from an earlier batch once
     await workbook.xlsx.readFile(ready.path!);
     assert.equal(workbook.worksheets[0].getCell('V13').value, 1200);
     assert.equal(workbook.worksheets[0].getCell('AE16').value, 'SGIS12DA3252-SA');
+  } finally {
+    store.close();
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+test('Friday evening waits, then joins Monday morning under Monday upload date', async () => {
+  assert.deepEqual(dispatchSession('2026-09-25T10:00:00Z', 'morning'), { date: '2026-09-25', shift: 'morning' });
+  assert.deepEqual(dispatchSession('2026-09-25T01:00:00Z', 'evening'), { date: '2026-09-25', shift: 'evening' });
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'toyota-shifts-'));
+  const store = new Store(dir);
+  try {
+    const engine = new Engine(store, { ...config, dataDir: dir });
+    const dated = (order: typeof orders[number], id: string, date: string) => {
+      const extraction = { ...structuredClone(order), delivery_date: date };
+      const page = pageFor(extraction, id);
+      page.text = page.text.replaceAll('20260903', date.replaceAll('-', '')).replaceAll('03/09/2026',
+        date.split('-').reverse().join('/'));
+      return page;
+    };
+    const run = async (id: string, created_at: string, dispatch_shift: 'morning' | 'evening', pages: ReturnType<typeof pageFor>[]) => {
+      await fs.mkdir(path.join(dir, id));
+      const job = store.save({ id, dispatch_shift, state: 'processing', stage: 'test', attempt: id,
+        created_at, updated_at: created_at, files: [], pages, results: [] });
+      await engine.finish(job);
+      return store.get(id)!;
+    };
+    const friday = await run('friday-morning', '2026-09-25T00:00:00Z', 'morning',
+      [dated(orders[0], 'friday', '2026-09-25')]);
+    assert.equal(friday.results[0].date, '2026-09-25');
+    const evening = await run('friday-evening', '2026-09-25T01:00:00Z', 'evening',
+      [dated(orders[2], 'evening', '2026-09-25')]);
+    assert.equal(evening.state, 'completed');
+    assert.equal(evening.results.length, 0);
+    assert.match(evening.stage, /next morning/);
+    const monday = await run('monday-morning', '2026-09-28T10:00:00Z', 'morning',
+      [dated(orders[0], 'repeated-friday', '2026-09-25'), dated(orders[1], 'monday', '2026-09-28')]);
+    const ready = monday.results.find((result) => result.status === 'ready')!;
+    assert.equal(monday.state, 'completed');
+    assert.equal(ready.date, '2026-09-28');
+    assert.equal(ready.order_count, 2);
+    assert.match(store.get('friday-evening')!.stage, /included in the morning Excel dated 28\/09\/2026/);
+    assert.deepEqual(ready.order_numbers, ['SGIS12DA3252-SA', 'SGIS12DA3251-SA']);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(ready.path!);
+    const sheet = workbook.worksheets[0];
+    assert.equal(sheet.getCell('F4').value, 'DATE : 28/09/2026');
+    assert.equal(sheet.getCell('AE13').value, 'SGIS12DA3251-SA');
+    assert.equal(sheet.getCell('AE16').value, 'SGIS12DA3252-SA');
+    const repeated = await run('tuesday-repeat', '2026-09-29T10:00:00Z', 'morning',
+      [dated(orders[0], 'repeated-again', '2026-09-25')]);
+    assert.equal(repeated.state, 'completed');
+    assert.equal(repeated.results.length, 0);
+    assert.match(repeated.stage, /already in an earlier morning Excel/);
   } finally {
     store.close();
     await fs.rm(dir, { recursive: true, force: true });

@@ -147,6 +147,66 @@
 .workflow-review p {
   color: #607087;
 }
+.dispatch-shift-picker {
+  margin: 20px 0;
+}
+.dispatch-shift-picker h3 {
+  margin: 0 0 6px;
+  color: #173655;
+  font-size: 17px;
+}
+.dispatch-shift-picker p {
+  margin: 0 0 12px;
+  color: #607087;
+}
+.dispatch-shift-picker > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.dispatch-shift-picker button {
+  padding: 15px;
+  border: 1px solid #c8d7ed;
+  border-radius: 10px;
+  background: #fff;
+  color: #173655;
+  text-align: left;
+  cursor: pointer;
+}
+.dispatch-shift-picker button.selected {
+  border-color: #176c3c;
+  background: #eef9f1;
+  box-shadow: inset 0 0 0 1px #176c3c;
+}
+.dispatch-shift-picker button:disabled {
+  cursor: default;
+}
+.dispatch-shift-picker button strong,
+.dispatch-shift-picker button small {
+  display: block;
+}
+.dispatch-shift-picker button small {
+  margin-top: 5px;
+  color: #607087;
+  line-height: 1.4;
+}
+@media (max-width: 600px) {
+  .dispatch-shift-picker > div { grid-template-columns: 1fr; }
+}
+.dispatch-waiting-note {
+  margin: 22px 0;
+  padding: 22px;
+  border: 1px solid #c8d7ed;
+  border-radius: 14px;
+  background: #edf3fd;
+  color: #173655;
+}
+.dispatch-waiting-note strong {
+  font-size: 19px;
+}
+.dispatch-waiting-note p {
+  margin: 8px 0 0;
+}
 .workflow-workbooks {
   display: flex;
   gap: 12px;

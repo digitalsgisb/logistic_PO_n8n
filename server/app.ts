@@ -176,11 +176,15 @@ export async function buildApp(options = config) {
     return { ok: true };
   });
   app.post('/api/jobs', async (req, reply) => {
+    const dispatchShift = req.headers['x-dispatch-shift'];
+    if (dispatchShift !== 'morning' && dispatchShift !== 'evening')
+      return reply.code(400).send({ error: 'Choose Morning or Evening before processing purchase orders.' });
     const id = randomUUID(),
       dir = path.join(options.dataDir, id);
     await fs.mkdir(dir, { recursive: true });
     const job: Job = {
       id,
+      dispatch_shift: dispatchShift,
       state: 'queued',
       stage: 'Queued',
       created_at: new Date().toISOString(),

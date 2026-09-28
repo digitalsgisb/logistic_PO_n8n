@@ -12,6 +12,7 @@ type Result = {
 };
 type Job = {
   id: string;
+  dispatch_shift?: 'morning' | 'evening';
   state: string;
   stage: string;
   progress: number;
@@ -36,12 +37,13 @@ export function Workflow({
   error: string;
   add: (f: File[]) => void;
   remove: (i: number) => void;
-  submit: () => void;
+  submit: (shift: 'morning' | 'evening') => void;
   restart: () => void;
   retry: () => void;
   maxMb: number;
 }) {
   const [mode, setMode] = useState('both'),
+    [dispatchShift, setDispatchShift] = useState<'morning' | 'evening' | null>(null),
     [tag, setTag] = useState<File>(),
     [started, setStarted] = useState(false),
     [step, setStep] = useState(1),
@@ -67,9 +69,13 @@ export function Workflow({
     setLocalError('');
   }
   function start() {
+    if (mode !== 'tags' && !dispatchShift) {
+      setLocalError('Choose Morning or Evening before processing your POs.');
+      return;
+    }
     setStarted(true);
     setStep(2);
-    if (mode !== 'tags') submit();
+    if (mode !== 'tags') submit(dispatchShift!);
     requestAnimationFrame(() =>
       document.getElementById('workflow-review')?.scrollIntoView({ block: 'start' }),
     );
@@ -78,6 +84,7 @@ export function Workflow({
     restart();
     setStarted(false);
     setTag(undefined);
+    setDispatchShift(null);
     setStep(1);
     setLocalError('');
   }
@@ -231,17 +238,41 @@ export function Workflow({
             </div>
           )}
         </div>
+        {mode !== 'tags' && (
+          <section className="dispatch-shift-picker" aria-labelledby="dispatch-shift-title">
+            <h3 id="dispatch-shift-title">Which order batch is this?</h3>
+            <p>Choose the batch you are handling. The choice does not depend on the time you upload.</p>
+            <div role="group" aria-label="Order batch">
+              {([
+                ['morning', 'Morning order', 'Create today’s Excel with saved evening orders.'],
+                ['evening', 'Evening order', 'Save these POs for the next morning. No Excel yet.'],
+              ] as const).map(([value, title, description]) => (
+                <button
+                  type="button"
+                  key={value}
+                  className={(job?.dispatch_shift ?? dispatchShift) === value ? 'selected' : ''}
+                  aria-pressed={(job?.dispatch_shift ?? dispatchShift) === value}
+                  disabled={active || busy}
+                  onClick={() => { setDispatchShift(value); setLocalError(''); }}
+                >
+                  <strong>{title}</strong>
+                  <small>{description}</small>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
         {!active && (
           <button
             className="primary"
-            disabled={busy || (mode !== 'tags' && !files.length) || (mode !== 'po' && !tag)}
+            disabled={busy || (mode !== 'tags' && (!files.length || !dispatchShift)) || (mode !== 'po' && !tag)}
             onClick={start}
           >
             Process documents →
           </button>
         )}
         {active && !job && mode !== 'tags' && !busy && (
-          <button className="primary" onClick={submit}>
+          <button className="primary" onClick={() => dispatchShift && submit(dispatchShift)}>
             Retry upload
           </button>
         )}
@@ -270,8 +301,27 @@ export function Workflow({
                 Download all {ready.length} workbooks as ZIP ↓
               </a>
             )}
-            <p className="kanban-card-note">One workbook per delivery date · Includes earlier retained uploads for that date · A4 landscape</p>
+            <p className="kanban-card-note">Dated to the morning upload · Includes saved evening orders · Previously dispatched POs are counted once · A4 landscape</p>
           </section>
+        )}
+        {done && !ready.length && job!.stage.startsWith('Evening orders saved') && (
+          <div className="dispatch-waiting-note" role="status">
+            <strong>Evening orders saved</strong>
+            <p>No Excel download yet. The next morning upload will combine these orders into one Excel dated that morning.</p>
+            <p>You can review and print rack tags now.</p>
+          </div>
+        )}
+        {done && !ready.length && job!.stage.startsWith('Evening orders included') && (
+          <div className="dispatch-waiting-note" role="status">
+            <strong>Included in the morning Excel</strong>
+            <p>{job!.stage} Open the morning batch to download the combined Excel.</p>
+          </div>
+        )}
+        {done && !ready.length && job!.stage.startsWith('These POs are already') && (
+          <div className="dispatch-waiting-note" role="status">
+            <strong>These POs were already dispatched</strong>
+            <p>They are in an earlier morning Excel, so no duplicate Excel was created. Upload a new morning order to prepare the next one.</p>
+          </div>
         )}
         {!active ? (
           <p>Your daily workbooks and rack quantities will appear here.</p>

@@ -5,8 +5,9 @@ import { Store } from './store.ts';
 import { config } from './config.ts';
 import { readPdf } from './pdf.ts';
 import { assemble, hash, sourceDeliveryDate, sourceItems } from './mapping.ts';
-import { batchFilename, ordersByDate, writeBatch } from './workbook.ts';
+import { batchFilename, writeBatch } from './workbook.ts';
 import type { Job, Extraction, Order } from './types.ts';
+import { dispatchSession } from './dispatch.ts';
 const running = new Set(['reading', 'processing', 'generating']);
 export class Engine {
   busy = false;
@@ -168,7 +169,7 @@ export class Engine {
   }
   async finish(job: Job) {
     job.state = 'generating';
-    job.stage = 'Generating Excel workbooks by delivery date';
+    job.stage = 'Preparing dispatch orders';
     this.store.save(job);
     const { orders, errors } = assemble(job.pages);
     const results = [...errors];
@@ -181,18 +182,61 @@ export class Engine {
           error: file.error,
           sources: [file.filename],
         });
+    const session = dispatchSession(job.created_at, job.dispatch_shift);
+    if (session.shift === 'evening') {
+      job.results = results;
+      job.state = orders.length ? (results.length ? 'partial' : 'completed') : 'failed';
+      job.stage = orders.length
+        ? 'Evening orders saved for the next morning. No Excel download yet.'
+        : 'Review required';
+      job.error = undefined;
+      this.store.save(job);
+      return;
+    }
     const byIdentity = new Map<string, Order>();
     const priorJobs = this.store.all()
       .filter((previous) => previous.id !== job.id && ['completed', 'partial'].includes(previous.state))
       .sort((a, b) => a.created_at.localeCompare(b.created_at));
+    const previousMorningDate = priorJobs
+      .filter((previous) => previous.results.some((result) => result.status === 'ready'))
+      .map((previous) => dispatchSession(previous.created_at, previous.dispatch_shift))
+      .filter((previous) => previous.shift === 'morning' && previous.date < session.date)
+      .map((previous) => previous.date)
+      .at(-1);
+    const alreadyDispatched = new Set(priorJobs
+      .filter((previous) => {
+        const shift = dispatchSession(previous.created_at, previous.dispatch_shift);
+        return shift.shift === 'morning' && shift.date < session.date;
+      })
+      .flatMap((previous) => previous.results
+        .filter((result) => result.status === 'ready')
+        .flatMap((result) => result.order_numbers ?? [])));
     const signature = (order: Order) => JSON.stringify({
       date: order.delivery_date, sequence: order.delivery_sequence, route: order.route,
       items: order.items, page_count: order.page_count,
     });
-    for (const previous of priorJobs)
-      for (const order of assemble(previous.pages).orders)
+    const carriedEveningJobs: Job[] = [];
+    for (const previous of priorJobs) {
+      const shift = dispatchSession(previous.created_at, previous.dispatch_shift);
+      const sameMorning = shift.shift === 'morning' && shift.date === session.date;
+      const awaitingEvening = shift.shift === 'evening' && shift.date < session.date &&
+        (!previousMorningDate || shift.date >= previousMorningDate);
+      if (!sameMorning && !awaitingEvening) continue;
+      const eligible = assemble(previous.pages).orders.filter((order) => !alreadyDispatched.has(order.kb_number));
+      if (awaitingEvening && eligible.length) carriedEveningJobs.push(previous);
+      for (const order of eligible)
         byIdentity.set(`${order.source_order_id}|${order.destination}`, order);
-    for (const order of orders) {
+    }
+    const freshOrders = orders.filter((order) => !alreadyDispatched.has(order.kb_number));
+    if (orders.length && !freshOrders.length && !results.length) {
+      job.results = [];
+      job.state = 'completed';
+      job.stage = 'These POs are already in an earlier morning Excel. Upload a new morning order to create the next Excel.';
+      job.error = undefined;
+      this.store.save(job);
+      return;
+    }
+    for (const order of freshOrders) {
       const key = `${order.source_order_id}|${order.destination}`;
       const prior = byIdentity.get(key);
       if (prior && signature(prior) !== signature(order))
@@ -205,17 +249,18 @@ export class Engine {
         });
       byIdentity.set(key, order);
     }
-    const currentDates = new Set(orders.map((order) => order.delivery_date));
-    const combined = [...byIdentity.values()].filter((order) => currentDates.has(order.delivery_date));
-    for (const [date, dailyOrders] of ordersByDate(combined)) {
+    const combined = [...byIdentity.values()];
+    if (freshOrders.length) {
+      const date = session.date;
+      const dailyOrders = combined;
       const id = `date-${date}`;
-      const filename = batchFilename(dailyOrders),
+      const filename = batchFilename(dailyOrders, date),
         out = path.join(this.options.dataDir, job.id, filename),
         temporary = `${out}.${randomUUID()}.tmp`,
         sources = [...new Set(dailyOrders.flatMap((order) => order.source_pages))];
       try {
         // Always rebuild from validated orders; retry never adds onto an old output.
-        await writeBatch(dailyOrders, this.options.template, temporary);
+        await writeBatch(dailyOrders, this.options.template, temporary, date);
         await fs.rename(temporary, out);
         results.push({
           id,
@@ -259,6 +304,13 @@ export class Engine {
           : 'Review required';
     job.error = undefined;
     this.store.save(job);
+    if (successes) {
+      const displayDate = session.date.split('-').reverse().join('/');
+      for (const previous of carriedEveningJobs) {
+        previous.stage = `Evening orders included in the morning Excel dated ${displayDate}.`;
+        this.store.save(previous);
+      }
+    }
   }
   retry(id: string) {
     const job = this.store.get(id);
@@ -288,6 +340,7 @@ export function publicJob(job: Job) {
   const done = job.pages.filter((p) => p.state === 'extracted' || p.state === 'error').length;
   return {
     id: job.id,
+    dispatch_shift: job.dispatch_shift,
     state: job.state,
     stage: job.stage,
     created_at: job.created_at,

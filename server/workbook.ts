@@ -4,7 +4,8 @@ import { writeFile } from 'node:fs/promises';
 import type { Order } from './types.ts';
 import { headers } from './mapping.ts';
 
-export function batchFilename(orders: Order[]) {
+export function batchFilename(orders: Order[], workbookDate?: string) {
+  if (workbookDate) return `Toyota_${workbookDate}_Combined.xlsx`;
   const dates = [...new Set(orders.map((order) => order.delivery_date))].sort();
   if (dates.length !== 1) throw new Error('Each workbook must contain exactly one delivery date.');
   return `Toyota_${dates[0]}_Combined.xlsx`;
@@ -21,9 +22,9 @@ export function ordersByDate(orders: Order[]): [string, Order[]][] {
 }
 
 /** Orders are validated and deduplicated by assemble before reaching this writer. */
-export async function writeBatch(orders: Order[], template: string, destination: string) {
+export async function writeBatch(orders: Order[], template: string, destination: string, workbookDate?: string) {
   if (!orders.length) throw new Error('No valid orders to include in the workbook.');
-  batchFilename(orders); // Reject mixed dates even when the caller supplies a custom filename.
+  batchFilename(orders, workbookDate); // Reject mixed dates unless the dispatch date is supplied.
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.readFile(template);
   const original = wb.getWorksheet('ASSB2016');
@@ -33,7 +34,7 @@ export async function writeBatch(orders: Order[], template: string, destination:
       throw new Error(`Template header mismatch: ${code}.`);
 
   // Each output contains one daily template; the engine groups orders before calling this writer.
-  const dates = [...new Set(orders.map((order) => order.delivery_date))].sort();
+  const dates = workbookDate ? [workbookDate] : [...new Set(orders.map((order) => order.delivery_date))].sort();
   for (const date of dates) {
     const sheet = original;
     // Force every generated daily sheet to one A4 landscape page.
@@ -60,7 +61,7 @@ export async function writeBatch(orders: Order[], template: string, destination:
     sheet.getCell('F4').value = `DATE : ${day}/${month}/${year}`;
     for (let trip = 1; trip <= 10; trip++) {
       const row = 13 + (trip - 1) * 3;
-      const tripOrders = orders.filter((order) => order.delivery_date === date && order.trip === trip);
+      const tripOrders = orders.filter((order) => (workbookDate || order.delivery_date === date) && order.trip === trip);
       const markersByOrder = new Map<Order, string>();
       for (const destination of ['BUKIT RAJA', 'SHAH ALAM'] as const) {
         const group = tripOrders

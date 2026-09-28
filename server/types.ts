@@ -63,6 +63,7 @@ export interface Result {
 }
 export interface Job {
   id: string;
+  dispatch_shift?: 'morning' | 'evening';
   state:
     | 'queued'
     | 'reading'
