@@ -1,5 +1,6 @@
 :root {
   scroll-behavior: smooth;
+  font-size: 15px;
   font-family: 'Segoe UI', Inter, Arial, sans-serif;
   color: #19212d;
   background: #f5f6f7;
@@ -11,12 +12,12 @@
 }
 .workflow-progress {
   position: sticky;
-  top: 76px;
+  top: var(--header-height);
   z-index: 10;
   display: flex;
   align-items: center;
-  gap: 24px;
-  padding: 16px 20px;
+  gap: 20px;
+  padding: 13px 18px;
   background: #f5f7fbee;
   backdrop-filter: blur(8px);
   border: 1px solid #dce3ee;
@@ -28,7 +29,7 @@
   gap: 8px;
   align-items: center;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
 }
 .workflow-progress b {
   border: 1px solid #c9d4e5;
@@ -45,7 +46,7 @@
   color: #607087;
 }
 .workflow-upload {
-  padding: 24px;
+  padding: 20px;
   background: white;
   border: 1px solid #dce3ee;
   border-radius: 16px;
@@ -67,7 +68,8 @@
   margin: 20px 0;
 }
 .workflow-modes button {
-  padding: 10px 16px;
+  padding: 9px 14px;
+  font-size: 13px;
   border: 1px solid #dce3ee;
   background: white;
   border-radius: 8px;
@@ -86,7 +88,7 @@
 .workflow-drop {
   border: 1px dashed #9eb1cc;
   border-radius: 12px;
-  padding: 22px;
+  padding: 18px;
   background: #f7f9fc;
 }
 .workflow-drop.dragging {
@@ -96,6 +98,7 @@
 .workflow-drop h3 {
   margin: 0;
   color: #173655;
+  font-size: 15px;
 }
 .workflow-drop p,
 .workflow-drop small {
@@ -141,7 +144,7 @@
   scroll-margin-top: 160px;
 }
 .workflow-review h2 {
-  font-size: 21px;
+  font-size: 19px;
   color: #173655;
 }
 .workflow-review p {
@@ -788,7 +791,7 @@ svg {
 .brand {
   display: block;
   min-width: 0;
-  margin: 4px 4px 50px;
+  margin: 4px 4px 42px;
 }
 .brand-lockup {
   display: inline-flex;
@@ -1035,8 +1038,7 @@ svg {
   width: var(--sidebar-width);
   z-index: 10;
   isolation: isolate;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  overflow: hidden;
   background: linear-gradient(155deg, #0c1f3b, #102b52 62%, #0d2548);
   color: #fff;
   padding: 30px 22px 20px;
@@ -1062,12 +1064,29 @@ svg {
   flex-shrink: 0;
 }
 .sidebar .brand-lockup { gap: 12px; }
-.sidebar .brand-workspace strong { font-size: 19px; letter-spacing: -.3px; }
-.sidebar .brand-sub { font-size: 11px; margin-top: 5px; }
-.sidebar-nav { display: grid; gap: 38px; }
+.sidebar .brand-workspace strong { font-size: 17px; letter-spacing: -.3px; }
+.sidebar .brand-sub { font-size: 10px; margin-top: 5px; }
+.sidebar > .sidebar-nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: 30px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 9px;
+  margin-right: -9px;
+  scrollbar-width: thin;
+  scrollbar-color: #5b7fab transparent;
+}
+.sidebar-nav::-webkit-scrollbar { width: 7px; }
+.sidebar-nav::-webkit-scrollbar-track { background: transparent; }
+.sidebar-nav::-webkit-scrollbar-thumb { background: #5b7fab; border-radius: 999px; }
+.sidebar-nav::-webkit-scrollbar-thumb:hover { background: #7b9dca; }
+.sidebar-nav::-webkit-scrollbar-button { display: none; }
 .sidebar-nav-group { display: grid; gap: 6px; }
 .nav-label {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   letter-spacing: 2px;
   margin: 0 12px 10px;
@@ -1077,14 +1096,14 @@ svg {
   display: flex;
   align-items: center;
   gap: 14px;
-  min-height: 54px;
+  min-height: 48px;
   border: 1px solid transparent;
   border-radius: 12px;
-  padding: 13px 14px;
+  padding: 11px 13px;
   background: transparent;
   color: #dae5f5;
   font: inherit;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   text-align: left;
   cursor: pointer;
@@ -1115,14 +1134,14 @@ svg {
 }
 .sidebar-bottom {
   margin-top: auto;
-  padding-top: 32px;
+  padding-top: 16px;
 }
 .sidebar-card {
   display: grid;
   gap: 5px;
   border: 1px solid #ffffff24;
   border-radius: 15px;
-  padding: 17px;
+  padding: 14px;
   background: #ffffff10;
 }
 .sidebar-card strong { font-size: 13px; color: #fff; }
@@ -1146,12 +1165,19 @@ svg {
   background: #7497cb;
   border-radius: 50%;
 }
-.sidebar .unit-mark { margin-top: 18px; }
+.sidebar .unit-mark {
+  margin-top: 14px;
+  gap: 7px;
+  font-size: 8px;
+  letter-spacing: .8px;
+  white-space: nowrap;
+}
+.sidebar .unit-mark > span:last-child { min-width: 0; white-space: nowrap; }
 .unit-mark {
   display: flex;
   align-items: center;
   gap: 9px;
-  padding: 17px 2px 0;
+  padding: 13px 2px 0;
   border-top: 1px solid #ffffff20;
   color: #b3c1d5;
   font-size: 9px;
@@ -1178,7 +1204,7 @@ main {
   width: 100%;
   max-width: 1600px;
   margin: 0 auto;
-  padding: 28px 38px 24px;
+  padding: 24px 32px;
 }
 .app main :is(button, input, a, summary) {
   scroll-margin-block: calc(var(--header-height) + 16px);
@@ -1194,7 +1220,7 @@ main {
   color: #0e284e;
 }
 h1 {
-  font-size: clamp(28px, 2.6vw, 38px);
+  font-size: clamp(26px, 2.4vw, 34px);
   line-height: 1.2;
   letter-spacing: -1.2px;
   font-weight: 650;

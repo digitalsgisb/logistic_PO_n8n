@@ -4,6 +4,10 @@ Verified on 4 September 2026 with Node 24.12.0 on Windows.
 
 ## Completed checks
 
+### Sidebar sizing and scroll — 29 September 2026
+
+- The sidebar now keeps the brand and DTU footer in place while its navigation scrolls with a thin navy scrollbar. Type and spacing were reduced slightly across the workspace, and the DTU label is kept on one line. TypeScript checking and the production web build passed.
+
 ### History controls and sidebar — 29 September 2026
 
 - Added an administrator-only **Clear history** control for saved PO dates, workbooks, upload jobs, and source PDFs. It preserves users, sessions, and the template, and refuses to run during an active upload. A migration marker prevents deleted test dates from returning after a restart.
