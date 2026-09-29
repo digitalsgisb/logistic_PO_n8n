@@ -200,7 +200,10 @@ export function assemble(pages: Page[]): { orders: Order[]; errors: Result[] } {
     try {
       place = destination(page.text);
     } catch {}
-    const key = ids.length === 1 ? ids[0] + '|' + place : page.id;
+    const sequences = [...new Set(page.text.match(/\b20\d{8}\b/g) ?? [])];
+    const key = ids.length === 1
+      ? `${ids[0]}|${place}|${sequences.length === 1 ? sequences[0] : 'UNKNOWN'}`
+      : page.id;
     groups.set(key, [...(groups.get(key) ?? []), page]);
   }
   const orders: Order[] = [],

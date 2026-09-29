@@ -45,6 +45,20 @@ export async function buildApp(options = config) {
   });
   const store = new Store(options.dataDir),
     engine = new Engine(store, options);
+  // Bring retained uploads from the previous shift-based release into the new
+  // date board once. Their old job downloads remain available while retained.
+  if (!store.allDates().length) {
+    for (const job of store.all().filter((entry) => ['completed', 'partial'].includes(entry.state))) {
+      const orders = assemble(job.pages).orders;
+      if (orders.length) {
+        try {
+          await engine.ledger.ingest(orders);
+        } catch (error) {
+          app.log.error({ err: error, job: job.id }, 'Could not migrate retained PO upload');
+        }
+      }
+    }
+  }
   store.ensureBootstrapUser(options.username, options.password);
   await app.register(cookie);
   await app.register(rateLimit, { global: false });
@@ -176,15 +190,11 @@ export async function buildApp(options = config) {
     return { ok: true };
   });
   app.post('/api/jobs', async (req, reply) => {
-    const dispatchShift = req.headers['x-dispatch-shift'];
-    if (dispatchShift !== 'morning' && dispatchShift !== 'evening')
-      return reply.code(400).send({ error: 'Choose Morning or Night before processing purchase orders.' });
     const id = randomUUID(),
       dir = path.join(options.dataDir, id);
     await fs.mkdir(dir, { recursive: true });
     const job: Job = {
       id,
-      dispatch_shift: dispatchShift,
       state: 'queued',
       stage: 'Queued',
       created_at: new Date().toISOString(),
@@ -250,6 +260,22 @@ export async function buildApp(options = config) {
     if (!job) throw Object.assign(new Error('Job not found or expired.'), { statusCode: 404 });
     return job;
   };
+  app.get('/api/dispatch-dates', () => ({
+    dates: store.allDates().map((entry) => engine.ledger.publicEntry(entry)),
+  }));
+  app.post<{ Params: { date: string } }>('/api/dispatch-dates/:date/complete', async (req) =>
+    engine.ledger.publicEntry(await engine.ledger.setComplete(req.params.date, true)),
+  );
+  app.post<{ Params: { date: string } }>('/api/dispatch-dates/:date/reopen', async (req) =>
+    engine.ledger.publicEntry(await engine.ledger.setComplete(req.params.date, false)),
+  );
+  app.get<{ Params: { date: string } }>('/api/dispatch-dates/:date/workbook', async (req, reply) => {
+    const output = engine.ledger.download(req.params.date);
+    reply
+      .type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      .header('Content-Disposition', `attachment; filename="${output.filename}"`);
+    return reply.send(createReadStream(output.path));
+  });
   app.get<{ Params: { id: string } }>('/api/jobs/:id', (req) => publicJob(getJob(req.params.id)));
   app.post<{ Querystring: { job?: string } }>('/api/tagging/review', async (req, reply) => {
     const part = await req.file({ limits: { files: 1, fileSize: options.maxFileBytes } });

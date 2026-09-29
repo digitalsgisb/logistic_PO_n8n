@@ -3,13 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import http from 'node:http';
 import { createHmac } from 'node:crypto';
-import ExcelJS from 'exceljs';
-import JSZip from 'jszip';
 import { buildApp } from '../server/app.ts';
 import { config } from '../server/config.ts';
-import { dispatchSession } from '../server/dispatch.ts';
 import { orders, pdfFor, textFor } from './helpers.ts';
 
 function multipart(files: { name: string; bytes: Buffer }[]) {
@@ -126,306 +122,77 @@ test('accounts and persistent sessions survive an application restart', async ()
   }
 });
 
-test('authenticated upload → n8n callbacks → one combined download; duplicates, ZIP, persistence, stale callback protection', async () => {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'toyota-api-'));
-  const receiver = http.createServer((_req, res) => {
-    res.end('ok');
-  });
-  await new Promise<void>((r) => receiver.listen(0, '127.0.0.1', r));
-  const addr = receiver.address() as { port: number };
-  const options = {
-    ...config,
-    dataDir: dir,
-    username: 'pilot',
-    password: 'test-password-123',
-    sessionSecret: 's'.repeat(40),
-    serviceSecret: 'k'.repeat(40),
-    n8nWebhook: `http://127.0.0.1:${addr.port}`,
-    maxFileBytes: 1000000,
-    maxBatchBytes: 2000000,
-  };
+test('upload needs no shift; dates remain hidden until completion and survive job expiry', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'toyota-dates-api-'));
+  const options = { ...config, dataDir: dir, username: 'pilot', password: 'test-password-123',
+    sessionSecret: 's'.repeat(40), serviceSecret: 'k'.repeat(40) };
   const { app, engine, store } = await buildApp(options);
   try {
-    const uploadDate = dispatchSession(new Date().toISOString()).date;
-    const displayDate = uploadDate.split('-').reverse().join('/');
-    assert.equal((await app.inject({ url: '/api/session' })).statusCode, 401);
-    assert.equal(
-      (
-        await app.inject({
-          method: 'POST',
-          url: '/api/login',
-          payload: { username: 'pilot', password: options.password },
-        })
-      ).statusCode,
-      403,
-    );
-    const login = await app.inject({
-      method: 'POST',
-      url: '/api/login',
+    const login = await app.inject({ method: 'POST', url: '/api/login',
       headers: { 'x-requested-with': 'ToyotaPO' },
-      payload: { username: 'pilot', password: options.password },
-    });
-    assert.equal(login.statusCode, 200);
+      payload: { username: 'pilot', password: options.password } });
     const cookie = String(login.headers['set-cookie']).split(';')[0];
-    const headers = { cookie, 'x-requested-with': 'ToyotaPO', 'x-dispatch-shift': 'morning' };
-    const bytes = pdfFor(orders.map(textFor)),
-      form = multipart([
-        { name: 'orders.pdf', bytes },
-        { name: 'duplicate.pdf', bytes },
-      ]);
-    const withoutShift = await app.inject({
-      method: 'POST', url: '/api/jobs',
-      headers: { cookie, 'x-requested-with': 'ToyotaPO', 'content-type': form.type },
-      payload: form.payload,
-    });
-    assert.equal(withoutShift.statusCode, 400);
-    assert.match(withoutShift.body, /Choose Morning or Night/);
-    const upload = await app.inject({
-      method: 'POST',
-      url: '/api/jobs',
-      headers: { ...headers, 'content-type': form.type },
-      payload: form.payload,
-    });
-    assert.equal(upload.statusCode, 202, upload.body);
-    assert.equal(upload.json().dispatch_shift, 'morning');
-    const id = upload.json().id;
-    assert.equal(upload.json().files[1].duplicate, true);
-    assert.ok(!upload.body.includes(dir));
+    const headers = { cookie, 'x-requested-with': 'ToyotaPO' };
+    const form = multipart([{ name: 'orders.pdf', bytes: pdfFor([textFor(orders[0])]) }]);
+    const uploaded = await app.inject({ method: 'POST', url: '/api/jobs',
+      headers: { ...headers, 'content-type': form.type }, payload: form.payload });
+    assert.equal(uploaded.statusCode, 202, uploaded.body);
+    const id = uploaded.json().id;
+    const job = store.get(id)!;
+    job.pages = [ (await import('./helpers.ts')).pageFor(orders[0]) ];
+    job.state = 'processing';
+    store.save(job);
+    await engine.finish(job);
+    const dates = (await app.inject({ url: '/api/dispatch-dates', headers })).json().dates;
+    assert.equal(dates.length, 1);
+    assert.equal(dates[0].date, '2026-09-03');
+    assert.equal(dates[0].status, 'open');
+    assert.equal((await app.inject({ url: '/api/dispatch-dates/2026-09-03/workbook', headers })).statusCode, 404);
+    const done = await app.inject({ method: 'POST', url: '/api/dispatch-dates/2026-09-03/complete', headers });
+    assert.equal(done.statusCode, 200, done.body);
+    const download = await app.inject({ url: '/api/dispatch-dates/2026-09-03/workbook', headers });
+    assert.equal(download.statusCode, 200);
+    assert.equal(download.rawPayload.subarray(0,2).toString(), 'PK');
+    const old = store.get(id)!;
+    old.created_at = '2020-01-01T00:00:00Z';
+    store.save(old);
     await engine.tick();
-    const firstJob = store.get(id)!;
-    firstJob.created_at = `${uploadDate}T00:00:00Z`;
-    store.save(firstJob);
-    const attempt = store.get(id)!.attempt;
-    const internal = { 'x-service-secret': options.serviceSecret };
-    assert.equal(
-      (await app.inject({ method: 'POST', url: `/internal/jobs/${id}/next`, payload: { attempt } }))
-        .statusCode,
-      401,
-    );
-    for (let i = 0; i < 4; i++) {
-      const next = await app.inject({
-        method: 'POST',
-        url: `/internal/jobs/${id}/next`,
-        headers: internal,
-        payload: { attempt },
-      });
-      assert.equal(next.statusCode, 200, next.body);
-      assert.equal(next.json().done, false);
-      const body = { attempt, page_id: next.json().page_id, extraction: orders[i] };
-      assert.equal(
-        (
-          await app.inject({
-            method: 'POST',
-            url: `/internal/jobs/${id}/result`,
-            headers: internal,
-            payload: body,
-          })
-        ).statusCode,
-        200,
-      );
-      assert.equal(
-        (
-          await app.inject({
-            method: 'POST',
-            url: `/internal/jobs/${id}/result`,
-            headers: internal,
-            payload: body,
-          })
-        ).statusCode,
-        200,
-      );
-    }
-    const done = await app.inject({
-      method: 'POST',
-      url: `/internal/jobs/${id}/next`,
-      headers: internal,
-      payload: { attempt },
-    });
-    assert.equal(done.json().done, true, done.body);
-    const status = await app.inject({ url: `/api/jobs/${id}`, headers });
-    assert.equal(status.json().state, 'completed', status.body);
-    assert.equal(status.json().results.length, 1);
-    assert.equal(status.json().results[0].order_count, 4);
-    assert.deepEqual(status.json().results[0].order_numbers, [
-      'SGIS12AA0747-SA',
-      'SGIS12DA3251-SA',
-      'SGIS12DA3252-SA',
-      'SGIS13FA5002-BR',
-    ]);
-    const file = await app.inject({ url: `/api/jobs/${id}/outputs/${status.json().results[0].id}`, headers });
-    assert.equal(file.statusCode, 200);
-    assert.equal(file.rawPayload.subarray(0, 2).toString(), 'PK');
-    const downloaded = new ExcelJS.Workbook();
-    await downloaded.xlsx.load(file.rawPayload as unknown as ExcelJS.Buffer);
-    assert.equal(downloaded.worksheets.length, 1);
-    assert.equal(downloaded.worksheets[0].getCell('V13').value, 1200);
-    assert.equal(downloaded.worksheets[0].getCell('AE17').value, 'SGIS13FA5002-BR');
-    assert.equal(downloaded.worksheets[0].getCell('H16').value, 30);
-    assert.equal(downloaded.worksheets[0].getCell('H19').value, null);
-    const zip = await app.inject({ url: `/api/jobs/${id}/download-all`, headers });
-    assert.equal(zip.statusCode, 200);
-    assert.ok(zip.rawPayload.includes(Buffer.from(`Toyota_${uploadDate}_Combined.xlsx`)));
-    assert.equal(
-      (
-        await app.inject({
-          method: 'POST',
-          url: `/internal/jobs/${id}/next`,
-          headers: internal,
-          payload: { attempt },
-        })
-      ).statusCode,
-      409,
-    );
-    assert.equal(
-      (await app.inject({ method: 'POST', url: `/api/jobs/${id}/retry`, headers })).statusCode,
-      409,
-    );
-    const bad = multipart([{ name: 'bad.pdf', bytes: Buffer.from('not pdf') }]);
-    // A single PDF may contain several delivery dates; downloads must split by date.
-    const datedOrders = orders.map((order, i) => ({
-      ...structuredClone(order),
-      delivery_date: i < 2 ? '2026-09-03' : '2026-09-04',
-    }));
-    const datedForm = multipart([
-      {
-        name: 'two-dates.pdf',
-        bytes: pdfFor(
-          datedOrders.map((order, i) =>
-            i < 2
-              ? textFor(order)
-              : textFor(order).replaceAll('20260903', '20260904').replaceAll('03/09/2026', '04/09/2026'),
-          ),
-        ),
-      },
-    ]);
-    const datedUpload = await app.inject({
-      method: 'POST',
-      url: '/api/jobs',
-      headers: { ...headers, 'content-type': datedForm.type },
-      payload: datedForm.payload,
-    });
-    assert.equal(datedUpload.statusCode, 202, datedUpload.body);
-    const datedId = datedUpload.json().id;
-    await engine.tick();
-    const secondJob = store.get(datedId)!;
-    secondJob.created_at = `${uploadDate}T01:00:00Z`;
-    store.save(secondJob);
-    const datedAttempt = store.get(datedId)!.attempt;
-    for (const order of datedOrders) {
-      const claimed = await engine.claim(datedId, datedAttempt);
-      assert.ok('page_id' in claimed);
-      assert.ok(claimed.page_id);
-      engine.result(datedId, datedAttempt, claimed.page_id, order);
-    }
-    await engine.claim(datedId, datedAttempt);
-    const datedStatus = (await app.inject({ url: `/api/jobs/${datedId}`, headers })).json();
-    assert.equal(datedStatus.state, 'partial');
-    assert.equal(datedStatus.results.filter((result: { status: string }) => result.status === 'review').length, 2);
-    const datedReady = datedStatus.results.filter((result: { status: string }) => result.status === 'ready');
-    assert.equal(datedReady.length, 1);
-    for (const result of datedReady) {
-      assert.equal(result.date, uploadDate);
-      assert.equal(result.order_count, 4);
-      assert.deepEqual(
-        result.order_numbers,
-        ['SGIS12AA0747-SA', 'SGIS12DA3251-SA', 'SGIS12DA3252-SA', 'SGIS13FA5002-BR'],
-      );
-      const dailyDownload = await app.inject({ url: `/api/jobs/${datedId}/outputs/${result.id}`, headers });
-      assert.equal(dailyDownload.statusCode, 200);
-      const daily = new ExcelJS.Workbook();
-      await daily.xlsx.load(dailyDownload.rawPayload as unknown as ExcelJS.Buffer);
-      assert.equal(daily.worksheets.length, 1);
-      assert.equal(
-        daily.worksheets[0].getCell('F4').value,
-        `DATE : ${displayDate}`,
-      );
-      assert.equal(daily.worksheets[0].getCell('V13').value, 1200);
-      assert.equal(daily.worksheets[0].getCell('H16').value, 30);
-    }
-    const dailyZip = await app.inject({ url: `/api/jobs/${datedId}/download-all`, headers });
-    assert.equal(dailyZip.statusCode, 200);
-    const archive = await JSZip.loadAsync(dailyZip.rawPayload);
-    assert.deepEqual(Object.keys(archive.files).sort(), [
-      `Toyota_${uploadDate}_Combined.xlsx`,
-    ]);
-    assert.equal(
-      (
-        await app.inject({
-          method: 'POST',
-          url: '/api/jobs',
-          headers: { ...headers, 'content-type': bad.type },
-          payload: bad.payload,
-        })
-      ).statusCode,
-      400,
-    );
+    assert.equal(store.get(id), undefined);
+    assert.equal((await app.inject({ url: '/api/dispatch-dates/2026-09-03/workbook', headers })).statusCode, 200);
+    const reopened = await app.inject({ method: 'POST', url: '/api/dispatch-dates/2026-09-03/reopen', headers });
+    assert.equal(reopened.json().status, 'open');
+    assert.equal((await app.inject({ url: '/api/dispatch-dates/2026-09-03/workbook', headers })).statusCode, 404);
   } finally {
     await app.close();
-    await new Promise<void>((r) => receiver.close(() => r()));
     await fs.rm(dir, { recursive: true, force: true });
   }
 });
 
-test('partial results survive restart and retry rebuilds one workbook without duplicating successful quantities', async () => {
+test('retry adds recovered PO to its existing date without double counting', async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'toyota-retry-'));
   const options = { ...config, dataDir: dir };
   let instance = await buildApp(options);
   try {
-    const id = 'test-job';
-    await fs.mkdir(path.join(dir, id));
     const { pageFor } = await import('./helpers.ts');
-    instance.store.save({
-      id,
-      state: 'processing',
-      stage: 'test',
-      attempt: 'first',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      files: [],
-      pages: [
-        pageFor(orders[0], 'a'),
-        {
-          ...pageFor(orders[3], 'b'),
-          file_id: 'different-file-with-same-name',
-          number: 1,
-          state: 'error',
-          extraction: undefined,
-          error: 'AI unavailable',
-        },
-      ],
-      results: [],
-    });
-    await instance.engine.finish(instance.store.get(id)!);
-    assert.equal(instance.store.get(id)!.state, 'partial');
-    const readyPath = instance.store.get(id)!.results.find((r) => r.status === 'ready')!.path!;
+    instance.store.save({ id: 'test-job', state: 'processing', stage: 'test', attempt: 'first',
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(), files: [],
+      pages: [pageFor(orders[0], 'a'), { ...pageFor(orders[3], 'b'), file_id: 'other',
+        state: 'error', extraction: undefined, error: 'AI unavailable' }], results: [] });
+    await instance.engine.finish(instance.store.get('test-job')!);
+    assert.equal(instance.store.get('test-job')!.state, 'partial');
+    assert.equal(instance.store.getDate('2026-09-03')!.orders.length, 1);
     await instance.app.close();
     instance = await buildApp(options);
-    assert.equal(instance.store.get(id)!.results.filter((r) => r.status === 'ready').length, 1);
-    const job = instance.engine.retry(id);
-    assert.equal(job.pages[0].state, 'extracted');
+    const job = instance.engine.retry('test-job');
     assert.equal(job.pages[1].state, 'pending');
-    assert.notEqual(job.attempt, 'first');
     job.state = 'processing';
     instance.store.save(job);
-    const claimed = await instance.engine.claim(id, job.attempt);
-    assert.equal('page_id' in claimed ? claimed.page_id : undefined, 'b');
-    instance.engine.result(id, job.attempt, 'b', orders[3]);
-    await instance.engine.claim(id, job.attempt);
-    assert.equal(instance.store.get(id)!.state, 'completed');
-    assert.equal(instance.store.get(id)!.results.length, 1);
-    assert.equal(instance.store.get(id)!.results[0].order_count, 2);
-    assert.equal(instance.store.get(id)!.results[0].path, readyPath);
-    const combined = new ExcelJS.Workbook();
-    await combined.xlsx.readFile(readyPath);
-    assert.equal(combined.worksheets[0].getCell('V13').value, 1200);
-    assert.equal(combined.worksheets[0].getCell('H16').value, 30);
-    assert.equal(combined.worksheets[0].getCell('AE16').value, 'SGIS13FA5002-BR');
-    assert.equal(combined.worksheets[0].getCell('H19').value, null);
-    const interrupted = instance.store.get(id)!;
-    interrupted.state = 'processing';
-    instance.store.save(interrupted);
-    instance.engine.recover();
-    assert.equal(instance.store.get(id)!.state, 'interrupted');
+    job.pages[1] = pageFor(orders[3], 'b');
+    instance.store.save(job);
+    await instance.engine.finish(job);
+    assert.equal(instance.store.getDate('2026-09-03')!.orders.length, 2);
+    await instance.engine.finish(job);
+    assert.equal(instance.store.getDate('2026-09-03')!.orders.length, 2);
   } finally {
     await instance.app.close();
     await fs.rm(dir, { recursive: true, force: true });

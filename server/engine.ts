@@ -5,16 +5,18 @@ import { Store } from './store.ts';
 import { config } from './config.ts';
 import { readPdf } from './pdf.ts';
 import { assemble, hash, sourceDeliveryDate, sourceItems } from './mapping.ts';
-import { batchFilename, writeBatch } from './workbook.ts';
-import type { Job, Extraction, Order } from './types.ts';
-import { dispatchSession } from './dispatch.ts';
+import { DateLedger } from './dateLedger.ts';
+import type { Job, Extraction } from './types.ts';
 const running = new Set(['reading', 'processing', 'generating']);
 export class Engine {
   busy = false;
+  ledger: DateLedger;
   constructor(
     public store: Store,
     public options = config,
-  ) {}
+  ) {
+    this.ledger = new DateLedger(store, options.dataDir, options.template);
+  }
   recover() {
     for (const job of this.store.all())
       if (running.has(job.state)) {
@@ -182,135 +184,22 @@ export class Engine {
           error: file.error,
           sources: [file.filename],
         });
-    const session = dispatchSession(job.created_at, job.dispatch_shift);
-    if (session.shift === 'evening') {
+    try {
+      const changes = await this.ledger.ingest(orders);
       job.results = results;
       job.state = orders.length ? (results.length ? 'partial' : 'completed') : 'failed';
+      const dates = changes.map((change) => change.date.split('-').reverse().join('/'));
       job.stage = orders.length
-        ? 'Night orders saved for the next morning. No Excel download yet.'
+        ? `Orders saved for ${dates.join(', ')}. Mark each date complete below when all POs have arrived.`
         : 'Review required';
       job.error = undefined;
-      this.store.save(job);
-      return;
-    }
-    const byIdentity = new Map<string, Order>();
-    const priorJobs = this.store.all()
-      .filter((previous) => previous.id !== job.id && ['completed', 'partial'].includes(previous.state))
-      .sort((a, b) => a.created_at.localeCompare(b.created_at));
-    const previousMorningDate = priorJobs
-      .filter((previous) => previous.results.some((result) => result.status === 'ready'))
-      .map((previous) => dispatchSession(previous.created_at, previous.dispatch_shift))
-      .filter((previous) => previous.shift === 'morning' && previous.date < session.date)
-      .map((previous) => previous.date)
-      .at(-1);
-    const alreadyDispatched = new Set(priorJobs
-      .filter((previous) => {
-        const shift = dispatchSession(previous.created_at, previous.dispatch_shift);
-        return shift.shift === 'morning' && shift.date < session.date;
-      })
-      .flatMap((previous) => previous.results
-        .filter((result) => result.status === 'ready')
-        .flatMap((result) => result.order_numbers ?? [])));
-    const signature = (order: Order) => JSON.stringify({
-      date: order.delivery_date, sequence: order.delivery_sequence, route: order.route,
-      items: order.items, page_count: order.page_count,
-    });
-    const carriedEveningJobs: Job[] = [];
-    for (const previous of priorJobs) {
-      const shift = dispatchSession(previous.created_at, previous.dispatch_shift);
-      const sameMorning = shift.shift === 'morning' && shift.date === session.date;
-      const awaitingEvening = shift.shift === 'evening' && shift.date < session.date &&
-        (!previousMorningDate || shift.date >= previousMorningDate);
-      if (!sameMorning && !awaitingEvening) continue;
-      const eligible = assemble(previous.pages).orders.filter((order) => !alreadyDispatched.has(order.kb_number));
-      if (awaitingEvening && eligible.length) carriedEveningJobs.push(previous);
-      for (const order of eligible)
-        byIdentity.set(`${order.source_order_id}|${order.destination}`, order);
-    }
-    const freshOrders = orders.filter((order) => !alreadyDispatched.has(order.kb_number));
-    if (orders.length && !freshOrders.length && !results.length) {
-      job.results = [];
-      job.state = 'completed';
-      job.stage = 'These POs are already in an earlier morning Excel. Upload a new morning order to create the next Excel.';
-      job.error = undefined;
-      this.store.save(job);
-      return;
-    }
-    for (const order of freshOrders) {
-      const key = `${order.source_order_id}|${order.destination}`;
-      const prior = byIdentity.get(key);
-      if (prior && signature(prior) !== signature(order))
-        results.push({
-          id: `changed-${hash(key).slice(0, 16)}`,
-          order_id: order.source_order_id,
-          status: 'review',
-          error: 'This PO differs from an earlier upload. The latest version is used in the new workbook; verify the change.',
-          sources: order.source_pages,
-        });
-      byIdentity.set(key, order);
-    }
-    const combined = [...byIdentity.values()];
-    if (freshOrders.length) {
-      const date = session.date;
-      const dailyOrders = combined;
-      const id = `date-${date}`;
-      const filename = batchFilename(dailyOrders, date),
-        out = path.join(this.options.dataDir, job.id, filename),
-        temporary = `${out}.${randomUUID()}.tmp`,
-        sources = [...new Set(dailyOrders.flatMap((order) => order.source_pages))];
-      try {
-        // Always rebuild from validated orders; retry never adds onto an old output.
-        await writeBatch(dailyOrders, this.options.template, temporary, date);
-        await fs.rename(temporary, out);
-        results.push({
-          id,
-          status: 'ready',
-          order_id: `Toyota orders — ${date}`,
-          order_count: dailyOrders.length,
-          order_numbers: dailyOrders.map((order) => order.kb_number),
-          destination: [...new Set(dailyOrders.map((order) => order.destination))].join(' / '),
-          date,
-          dates: [date],
-          filename,
-          path: out,
-          sources,
-          source_page_ids: dailyOrders.flatMap((order) => order.source_page_ids),
-        });
-      } catch (e) {
-        results.push({
-          id,
-          status: 'review',
-          order_id: `Toyota orders — ${date}`,
-          date,
-          error: e instanceof Error ? e.message : String(e),
-          sources,
-        });
-      } finally {
-        await fs.rm(temporary, { force: true });
-      }
+    } catch (error) {
       job.results = results;
-      this.store.save(job);
+      job.state = 'partial';
+      job.stage = 'Some orders could not be saved. Retry this batch.';
+      job.error = error instanceof Error ? error.message : String(error);
     }
-    job.results = results;
-    const successes = results.filter((r) => r.status === 'ready').length;
-    job.state = successes ? (results.some((r) => r.status === 'review') ? 'partial' : 'completed') : 'failed';
-    job.stage =
-      job.state === 'completed'
-        ? successes === 1
-          ? 'Your daily workbook is ready'
-          : 'Your daily workbooks are ready'
-        : successes
-          ? 'Completed with items to review'
-          : 'Review required';
-    job.error = undefined;
     this.store.save(job);
-    if (successes) {
-      const displayDate = session.date.split('-').reverse().join('/');
-      for (const previous of carriedEveningJobs) {
-        previous.stage = `Night orders included in the morning Excel dated ${displayDate}.`;
-        this.store.save(previous);
-      }
-    }
   }
   retry(id: string) {
     const job = this.store.get(id);
@@ -340,9 +229,8 @@ export function publicJob(job: Job) {
   const done = job.pages.filter((p) => p.state === 'extracted' || p.state === 'error').length;
   return {
     id: job.id,
-    dispatch_shift: job.dispatch_shift,
     state: job.state,
-    stage: job.stage.replace(/^Evening orders/, 'Night orders'),
+    stage: job.stage,
     created_at: job.created_at,
     error: job.error,
     progress: terminal

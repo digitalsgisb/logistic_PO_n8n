@@ -147,66 +147,6 @@
 .workflow-review p {
   color: #607087;
 }
-.dispatch-shift-picker {
-  margin: 20px 0;
-}
-.dispatch-shift-picker h3 {
-  margin: 0 0 6px;
-  color: #173655;
-  font-size: 17px;
-}
-.dispatch-shift-picker p {
-  margin: 0 0 12px;
-  color: #607087;
-}
-.dispatch-shift-picker > div {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-.dispatch-shift-picker button {
-  padding: 15px;
-  border: 1px solid #c8d7ed;
-  border-radius: 10px;
-  background: #fff;
-  color: #173655;
-  text-align: left;
-  cursor: pointer;
-}
-.dispatch-shift-picker button.selected {
-  border-color: #176c3c;
-  background: #eef9f1;
-  box-shadow: inset 0 0 0 1px #176c3c;
-}
-.dispatch-shift-picker button:disabled {
-  cursor: default;
-}
-.dispatch-shift-picker button strong,
-.dispatch-shift-picker button small {
-  display: block;
-}
-.dispatch-shift-picker button small {
-  margin-top: 5px;
-  color: #607087;
-  line-height: 1.4;
-}
-@media (max-width: 600px) {
-  .dispatch-shift-picker > div { grid-template-columns: 1fr; }
-}
-.dispatch-waiting-note {
-  margin: 22px 0;
-  padding: 22px;
-  border: 1px solid #c8d7ed;
-  border-radius: 14px;
-  background: #edf3fd;
-  color: #173655;
-}
-.dispatch-waiting-note strong {
-  font-size: 19px;
-}
-.dispatch-waiting-note p {
-  margin: 8px 0 0;
-}
 .workflow-workbooks {
   display: flex;
   gap: 12px;
@@ -2107,3 +2047,23 @@ h3 {
     transition: none !important;
   }
 }
+.date-board { margin: 24px 0; }
+.date-board-heading { display: flex; justify-content: space-between; align-items: start; gap: 20px; }
+.date-board-heading h3 { margin: 0 0 6px; color: #173a57; font-size: 1.3rem; }
+.date-board-heading p { margin: 0 0 18px; max-width: 70ch; color: #5e7184; line-height: 1.5; }
+.date-board-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 14px; }
+.date-card { border: 1px solid #dbe4eb; border-radius: 16px; background: white; padding: 20px; box-shadow: 0 6px 18px #12324b0a; }
+.date-card-top { display: flex; align-items: start; justify-content: space-between; gap: 10px; }
+.date-card-top strong { display: block; color: #173a57; font-size: 1.25rem; }
+.date-card-top small { display: block; margin-top: 3px; color: #64778b; }
+.date-status { border-radius: 999px; padding: 5px 10px; background: #fff2db; color: #865015; font-size: .78rem; font-weight: 700; white-space: nowrap; }
+.date-status.complete { background: #e4f5ea; color: #187448; }
+.date-card details { margin: 16px 0; color: #4f6477; }
+.date-card summary { cursor: pointer; font-weight: 600; }
+.date-card details p { overflow-wrap: anywhere; }
+.date-card details small { overflow-wrap: anywhere; }
+.date-card-actions { display: grid; gap: 10px; }
+.date-card-actions p { margin: 0; color: #5e7184; line-height: 1.4; }
+.date-card-actions .primary, .date-card-actions .outline { width: 100%; justify-content: center; }
+.date-card-actions .excel-download { width: 100%; }
+@media (max-width: 650px) { .date-board-heading { flex-direction: column; } }

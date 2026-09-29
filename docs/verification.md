@@ -4,7 +4,13 @@ Verified on 4 September 2026 with Node 24.12.0 on Windows.
 
 ## Completed checks
 
-### Morning dispatch and night carryover — 28 September 2026
+### Operator-confirmed delivery dates — 29 September 2026
+
+- The supplied PDS PDF has four nonzero orders dated 25 September and one dated 28 September, plus a zero-order page. The printed `YYYYMMDDNN` sequence supplies the date and trip.
+- Uploads now collect validated orders in persistent date records and save a draft Excel per date. Only a deliberate **Mark date complete** action makes its workbook downloadable. Reopen and later changed POs return the date to the waiting state.
+- TypeScript, 30 automated tests, and the production web build passed. Tests cover hidden drafts, mixed dates, a repeated PO identifier across dates or trips, merging uploads, duplicate handling, completion, reopening, and download after upload-job expiry. No live n8n run or physical print was performed.
+
+### Superseded: Morning dispatch and night carryover — 28 September 2026
 
 - The operator must choose Morning order or Night order before a PO upload; the choice is saved with the batch and does not depend on upload time. Morning creates one workbook dated with the upload's Malaysia calendar date. Night saves validated orders without an Excel download; tagging review and printing remain available.
 - The next morning upload combines its orders with retained night orders since the previous morning, including Friday night to Monday morning. Repeated POs are counted once. Mixed source delivery dates can share that morning's workbook while each PO's source date and sequence remain validated.

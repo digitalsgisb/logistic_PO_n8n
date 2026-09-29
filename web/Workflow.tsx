@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Tagging } from './Tagging';
-import { ExcelDownload } from './ExcelDownload';
+import { DateBoard } from './DateBoard';
 type Result = {
   id: string;
   status: string;
@@ -12,10 +12,10 @@ type Result = {
 };
 type Job = {
   id: string;
-  dispatch_shift?: 'morning' | 'evening';
   state: string;
   stage: string;
   progress: number;
+  error?: string;
   results: Result[];
   files: { filename: string }[];
 };
@@ -37,13 +37,12 @@ export function Workflow({
   error: string;
   add: (f: File[]) => void;
   remove: (i: number) => void;
-  submit: (shift: 'morning' | 'evening') => void;
+  submit: () => void;
   restart: () => void;
   retry: () => void;
   maxMb: number;
 }) {
   const [mode, setMode] = useState('both'),
-    [dispatchShift, setDispatchShift] = useState<'morning' | 'evening' | null>(null),
     [tag, setTag] = useState<File>(),
     [started, setStarted] = useState(false),
     [step, setStep] = useState(1),
@@ -53,9 +52,7 @@ export function Workflow({
     if (job) setStep(2);
   }, [job?.id]);
   const done = !!job && ['completed', 'partial', 'failed', 'interrupted'].includes(job.state);
-  const ready = job?.results.filter((r) => r.status === 'ready') ?? [];
   const canReview = mode === 'tags' ? started : done;
-  const workbooks = ready.map((r) => ({ ...r, href: `/api/jobs/${job!.id}/outputs/${r.id}` }));
   function selectTag(incoming: File[]) {
     if (
       incoming.length !== 1 ||
@@ -69,13 +66,9 @@ export function Workflow({
     setLocalError('');
   }
   function start() {
-    if (mode !== 'tags' && !dispatchShift) {
-      setLocalError('Choose Morning or Night before processing your POs.');
-      return;
-    }
     setStarted(true);
     setStep(2);
-    if (mode !== 'tags') submit(dispatchShift!);
+    if (mode !== 'tags') submit();
     requestAnimationFrame(() =>
       document.getElementById('workflow-review')?.scrollIntoView({ block: 'start' }),
     );
@@ -84,7 +77,6 @@ export function Workflow({
     restart();
     setStarted(false);
     setTag(undefined);
-    setDispatchShift(null);
     setStep(1);
     setLocalError('');
   }
@@ -127,6 +119,7 @@ export function Workflow({
           {error || localError}
         </p>
       )}
+      {job?.error && <p className="error" role="alert">{job.error}</p>}
       <details className="workflow-upload" id="workflow-upload" open={!active || !!error || !!localError}>
         <summary>
           <strong>1. Documents</strong>
@@ -238,91 +231,23 @@ export function Workflow({
             </div>
           )}
         </div>
-        {mode !== 'tags' && (
-          <section className="dispatch-shift-picker" aria-labelledby="dispatch-shift-title">
-            <h3 id="dispatch-shift-title">Which order batch is this?</h3>
-            <p>Choose the batch you are handling. The choice does not depend on the time you upload.</p>
-            <div role="group" aria-label="Order batch">
-              {([
-                ['morning', 'Morning order', 'Create today’s Excel with saved night orders.'],
-                ['evening', 'Night order', 'Save these POs for the next morning. No Excel yet.'],
-              ] as const).map(([value, title, description]) => (
-                <button
-                  type="button"
-                  key={value}
-                  className={(job?.dispatch_shift ?? dispatchShift) === value ? 'selected' : ''}
-                  aria-pressed={(job?.dispatch_shift ?? dispatchShift) === value}
-                  disabled={active || busy}
-                  onClick={() => { setDispatchShift(value); setLocalError(''); }}
-                >
-                  <strong>{title}</strong>
-                  <small>{description}</small>
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
         {!active && (
           <button
             className="primary"
-            disabled={busy || (mode !== 'tags' && (!files.length || !dispatchShift)) || (mode !== 'po' && !tag)}
+            disabled={busy || (mode !== 'tags' && !files.length) || (mode !== 'po' && !tag)}
             onClick={start}
           >
             Process documents →
           </button>
         )}
         {active && !job && mode !== 'tags' && !busy && (
-          <button className="primary" onClick={() => dispatchShift && submit(dispatchShift)}>
+          <button className="primary" onClick={submit}>
             Retry upload
           </button>
         )}
       </details>
       <section className="workflow-review" id="workflow-review">
         <h2>2. Review your dispatch</h2>
-        {!!workbooks.length && (
-          <section className="kanban-download-card" aria-labelledby="kanban-download-title">
-            <div className="kanban-card-heading">
-              <span className="kanban-card-icon" aria-hidden="true">
-                X<span>▦</span>
-              </span>
-              <div>
-                <span className="kanban-card-eyebrow">EXCEL WORKBOOK · READY</span>
-                <h3 id="kanban-download-title">Download your Kanban Excel</h3>
-                <p>Your daily Kanban sheet is ready. Download it here, then open Excel to print.</p>
-              </div>
-            </div>
-            <div className="workflow-workbooks">
-              {workbooks.map((r) => (
-                <ExcelDownload href={r.href} key={r.id} date={r.date} orders={r.order_count} />
-              ))}
-            </div>
-            {ready.length > 1 && (
-              <a className="kanban-download-all" href={`/api/jobs/${job!.id}/download-all`}>
-                Download all {ready.length} workbooks as ZIP ↓
-              </a>
-            )}
-            <p className="kanban-card-note">Dated to the morning upload · Includes saved night orders · Previously dispatched POs are counted once · A4 landscape</p>
-          </section>
-        )}
-        {done && !ready.length && (job!.stage.startsWith('Night orders saved') || job!.stage.startsWith('Evening orders saved')) && (
-          <div className="dispatch-waiting-note" role="status">
-            <strong>Night orders saved</strong>
-            <p>No Excel download yet. The next morning upload will combine these orders into one Excel dated that morning.</p>
-            <p>You can review and print rack tags now.</p>
-          </div>
-        )}
-        {done && !ready.length && (job!.stage.startsWith('Night orders included') || job!.stage.startsWith('Evening orders included')) && (
-          <div className="dispatch-waiting-note" role="status">
-            <strong>Included in the morning Excel</strong>
-            <p>{job!.stage.replace(/^Evening orders/, 'Night orders')} Open the morning batch to download the combined Excel.</p>
-          </div>
-        )}
-        {done && !ready.length && job!.stage.startsWith('These POs are already') && (
-          <div className="dispatch-waiting-note" role="status">
-            <strong>These POs were already dispatched</strong>
-            <p>They are in an earlier morning Excel, so no duplicate Excel was created. Upload a new morning order to prepare the next one.</p>
-          </div>
-        )}
         {!active ? (
           <p>Your daily workbooks and rack quantities will appear here.</p>
         ) : busy ? (
@@ -339,6 +264,7 @@ export function Workflow({
               {r.order_id}: {r.error}
             </p>
           ))}
+        <DateBoard refreshKey={job?.id + ':' + job?.state} />
         {done && ['partial', 'failed', 'interrupted'].includes(job!.state) && (
           <button className="outline" onClick={retry}>
             Retry unsuccessful POs
@@ -358,7 +284,7 @@ export function Workflow({
           maxMb={maxMb}
           sourceFile={tag}
           guided
-          workbooks={workbooks}
+          workbooks={[]}
           onStage={setStep}
         />
       )}

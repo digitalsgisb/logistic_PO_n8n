@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
-import type { Job } from './types.ts';
+import type { Job, DispatchDate } from './types.ts';
 import { hashPassword, verifyPassword } from './auth.ts';
 
 export interface UserAccount {
@@ -22,6 +22,7 @@ export class Store {
       PRAGMA journal_mode=WAL;
       PRAGMA foreign_keys=ON;
       CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, payload TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS dispatch_dates (date TEXT PRIMARY KEY, payload TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS users (
         username TEXT PRIMARY KEY COLLATE NOCASE,
         password_hash TEXT NOT NULL,
@@ -139,6 +140,19 @@ export class Store {
   }
   delete(id: string) {
     this.db.prepare('DELETE FROM jobs WHERE id=?').run(id);
+  }
+  saveDate(entry: DispatchDate) {
+    this.db.prepare('INSERT INTO dispatch_dates VALUES (?,?) ON CONFLICT(date) DO UPDATE SET payload=excluded.payload')
+      .run(entry.date, JSON.stringify(entry));
+    return entry;
+  }
+  getDate(date: string): DispatchDate | undefined {
+    const row = this.db.prepare('SELECT payload FROM dispatch_dates WHERE date=?').get(date);
+    return row ? JSON.parse(String(row.payload)) : undefined;
+  }
+  allDates(): DispatchDate[] {
+    return this.db.prepare('SELECT payload FROM dispatch_dates ORDER BY date DESC').all()
+      .map((row) => JSON.parse(String(row.payload)));
   }
   close() {
     this.db.close();

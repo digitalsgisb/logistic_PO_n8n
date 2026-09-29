@@ -63,7 +63,6 @@ export interface Result {
 }
 export interface Job {
   id: string;
-  dispatch_shift?: 'morning' | 'evening';
   state:
     | 'queued'
     | 'reading'
@@ -81,4 +80,13 @@ export interface Job {
   pages: Page[];
   results: Result[];
   error?: string;
+}
+export interface DispatchDate {
+  date: string;
+  status: 'open' | 'complete';
+  orders: Order[];
+  updated_at: string;
+  completed_at?: string;
+  reopened_reason?: 'new_po' | 'manual';
+  revision: number;
 }

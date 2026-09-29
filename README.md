@@ -1,12 +1,12 @@
 # Logistic Digital
 
-An internal Toyota order converter: upload PDF purchase orders, extract them with local Ollama through n8n, and download one combined kanban workbook for each morning dispatch.
+An internal Toyota order converter: upload PDF purchase orders, extract them with local Ollama through n8n, and save one combined Kanban workbook for each printed PO delivery date, releasing it when the operator confirms that date is complete.
 
-The interface uses a compact Sugihara Grand Industries logo, Digital Transformation Unit branding, and a dark-blue palette with a subtle animated gradient. The header and desktop sidebar stay fixed while content scrolls. Animation respects reduced-motion preferences. PO numbers go in Remarks beside their trip: `SGIS12AA0747-SA` for Shah Alam and `SGIS13FA5002-BR` for Bukit Raja. Original order IDs are retained separately for source validation. Before processing a PO, the operator must choose **Morning order** or **Night order**; the app does not infer the choice from the upload time or PO trip. Night uploads validate and save their orders but produce no Excel. The next morning upload combines them with that morning's orders into one Excel dated with the morning upload's Malaysia calendar date. The next actual morning upload is used, including after a weekend. Repeated POs are counted once. Tagging review and printing remain available for night uploads.
+The interface uses a compact Sugihara Grand Industries logo, Digital Transformation Unit branding, and a dark-blue palette with a subtle animated gradient. The header and desktop sidebar stay fixed while content scrolls. Animation respects reduced-motion preferences. PO numbers go in Remarks beside their trip: `SGIS12AA0747-SA` for Shah Alam and `SGIS13FA5002-BR` for Bukit Raja. Original order IDs are retained separately for source validation. POs are grouped by their printed delivery date, even when one PDF contains several dates. Each date has a saved draft Excel. The operator marks a date complete only after all its POs have arrived; this unlocks the download. A later changed PO reopens the date for review and a revised Excel. Repeated POs are counted once. Tagging review and printing remain available after each upload.
 
 ## Rack tagging and Windows printing
 
-The workspace follows **Upload → Review → Print**. Choose **PO + tagging** for the complete task, select both PDFs, and click **Process documents**. The tagging PDF waits for PO processing before quantity checks. **PO only** and **Tagging only** remain available. Completed uploads collapse into a summary, and review groups pages by date, destination and trip with the daily Excel download beside the date. Clean page previews start collapsed; warnings open automatically. Copy changes clear print confirmation. Use **New batch** to start over; after a refresh, select the tagging file again under Documents.
+The workspace follows **Upload → Review → Print**. Choose **PO + tagging** for the complete task, select both PDFs, and click **Process documents**. The tagging PDF waits for PO processing before quantity checks. **PO only** and **Tagging only** remain available. Completed uploads collapse into a summary, and review groups pages by date, destination and trip with saved dates shown in the Orders by date board. Clean page previews start collapsed; warnings open automatically. Copy changes clear print confirmation. Use **New batch** to start over; after a refresh, select the tagging file again under Documents.
 
 Choose **Daily dispatch** in the sidebar to upload documents, or **Review & print** to return to your results. Small-tag pages default to one copy each. Each small tag represents one rack (repeated part tags count separately). The large page is identified by its ORDER NUMBER and SKID NO fields and matched by destination, delivery sequence, supplier, dock and lane. Its copies equal two per rack, except Bukit Raja `614` and Shah Alam `238X`, `HU82`, which need one per rack. HU83 (HOOK) always contributes exactly two large-page copies total, including when the PO lists three racks. The supplied six-rack example produces two original small-tag sheets plus twelve large-page copies: fourteen printed pages.
 
@@ -66,7 +66,7 @@ docker compose ps
 docker compose logs --tail=80 api
 ```
 
-Open **http://127.0.0.1:3500** on the server, or use the hostname configured in your tunnel, and sign in with the account from `.env`. Upload the sample PDF and verify one downloadable workbook containing four orders and nine item lines.
+Open **http://127.0.0.1:3500** on the server, or use the hostname configured in your tunnel, and sign in with the account from `.env`. Upload the sample PDF and verify that the sample date holds four orders and nine item lines, then mark it complete to download its workbook.
 
 ### Accounts and persistent sign-in
 
@@ -101,7 +101,7 @@ docker compose up -d --build
 
 Jobs, original uploads, extracted values, outputs, user accounts, and login sessions are stored in the `toyota-data` volume. Back up that volume if required. Do not use `docker compose down -v` when keeping jobs or accounts. New application versions preserve the volume; interrupted work is marked retryable after restart. Files and job records expire after seven days by default; accounts and sessions do not.
 
-For the combined-output update, keep your working `.env`, Compose networking changes, and n8n workflow URLs. Only the application needs rebuilding. Completed jobs keep their existing downloads; choose **Start new batch** and upload the PDFs again to get the new combined layout. Retried partial jobs rebuild a single workbook from all valid orders.
+For the combined-output update, keep your working `.env`, Compose networking changes, and n8n workflow URLs. Only the application needs rebuilding. Existing job downloads remain available while retained. New uploads feed persistent date records; use **New batch** to add more POs. Retrying a partial job updates the affected date drafts without double counting.
 
 The trip-sequence correction and larger Remarks text require rebuilding the **API**, which generates the workbook; rebuilding only `web` will not apply them. Run `docker compose up -d --build` after pulling, then start a new batch and upload the PDFs again. The API reads the printed delivery sequence from the saved PDF text, so the existing n8n workflow and extraction schema remain compatible. The bundled prompt now clarifies the distinction between route and trip, but reimporting the workflow is not required for this fix.
 
@@ -130,7 +130,7 @@ npm test
 npm run build
 ```
 
-Tests generate synthetic text PDFs and cover authentication, uploads, duplicate file detection, PDF overlay deduplication, source-grounded validation, multi-page orders, partial failures, restart/retry, stale callbacks, Excel cells, and ZIP downloads. They do not require your source PDF or an AI server.
+Tests generate synthetic text PDFs and cover authentication, uploads, duplicate file detection, PDF overlay deduplication, source-grounded validation, multi-page orders, partial failures, restart/retry, stale callbacks, Excel cells, and confirmation-gated date downloads. They do not require your source PDF or an AI server.
 
 To test the original sample with the real AI model, place `TOYOTA PO.pdf` in the root (ignored by Git), or set `SAMPLE_PDF` to its path:
 
@@ -146,11 +146,11 @@ Outputs go to `outputs/combined-live-sample/`. Without `--live`, the sample scri
 - Item-code headers map deterministically to columns D–AD. Bukit Raja occupies D–U and Shah Alam V–AD.
 - Trip quantity rows begin at 13 and repeat every three rows. The trip comes from the last two digits of the printed `YYYYMMDDNN` delivery sequence: `2026090301` is Trip 1, `2026090302` is Trip 2. The first eight digits must match the delivery date, and trips 01–10 are supported. Missing, conflicting, or invalid sequences require review.
 - `WS02-NN` and `WM02-NN` are route identifiers, separate from the trip. For example, the sample Bukit Raja order has route `WM02-03` but sequence `2026090302`, so its quantities and Remarks belong to Trip 2. HU83 retains route `WS02-01` even when `PA1-10` is also printed.
-- `QTY` uses total pieces. Orders sharing a morning dispatch workbook, trip, and item code are added into that quantity cell; conflicting part numbers require review.
+- `QTY` uses total pieces. Orders sharing a delivery-date workbook, trip, and item code are added into that quantity cell; conflicting part numbers require review.
 - Suffixed PO numbers appear once per order in column AE (Remarks), within that trip's three rows, in bold 20-point text. Wrapped Remarks rows expand when needed. KB NO, DO.NO, ETA, and outstanding cells remain blank.
-- Matching stars are assigned separately within each morning dispatch workbook, trip, and destination. A destination with only one PO has no marker. With multiple POs, one base PO stays unmarked and the others use `*`, `**`, etc. HOOK (HU83, shown as 1200 in the sample) receives the first star when paired with a non-HOOK PO. PO-number ordering makes assignments independent of upload order. Shared quantities list contributing nonempty labels below the total; quantity cells remain numeric for calculations.
+- Matching stars are assigned separately within each delivery-date workbook, trip, and destination. A destination with only one PO has no marker. With multiple POs, one base PO stays unmarked and the others use `*`, `**`, etc. HOOK (HU83, shown as 1200 in the sample) receives the first star when paired with a non-HOOK PO. PO-number ordering makes assignments independent of upload order. Shared quantities list contributing nonempty labels below the total; quantity cells remain numeric for calculations.
 - Every generated daily sheet uses A4 landscape with the template print area fitted to one page wide and one page tall. Pull and rebuild the API (`docker compose up -d --build`), then start a new batch to apply these settings and star labels to downloads.
-- The source delivery sequence and arrival/delivery date are validated, even when the pickup date differs. The workbook header and `Toyota_YYYY-MM-DD_Combined.xlsx` filename use the morning upload's Malaysia calendar date. A morning upload combines its validated orders with saved night orders since the previous morning, including across weekends. Repeated morning uploads on the same day rebuild a cumulative file. Earlier uploads must still be retained (seven days by default).
+- The source delivery sequence and arrival/delivery date are validated, even when the pickup date differs. The workbook header and `Toyota_YYYY-MM-DD_Combined.xlsx` filename use the printed delivery date. Every validated upload updates that date's saved draft, including dates shared across uploads or mixed within one PDF. Drafts and date records remain after short-lived upload jobs expire. Downloads unlock only after the operator marks the date complete.
 - Repeated order pages are deduplicated; missing pages and conflicting versions require review. Source orders remain separate in extraction records. Within one order, repeated matching items are summed only when part and pack details agree.
 - Matching source identifiers and numeric values is mandatory. Unknown destinations/codes/routes, ambiguous dates, missing items, and quantity discrepancies do not produce a ready workbook.
 
@@ -159,7 +159,7 @@ Outputs go to `outputs/combined-live-sample/`. Without `--live`, the sample scri
 1. Copy `templates/toyota.xlsx` as a backup. Open `templates/toyota.xlsx` in Microsoft Excel and edit the `ASSB2016` sheet. Save as `.xlsx` in the same location; keep the worksheet name.
 2. For visual changes, edit colours, borders, fills, static labels, column widths, and row heights. Keep the item-code headings in row 8 and their columns D–AD; the converter checks them before writing. Keep the trip layout at rows 13, 16, 19, and every three rows through row 40, and the Remarks cells in column AE.
 3. Leave generated cells blank in the template: date `F4`, trip quantity cells, and Remarks `AE13:AE42`. The converter writes those values for each new file. It also sets A4 landscape, print area `A4:AE42`, fit to one page, and some font sizes, so edit `server/workbook.ts` if you need those settings to change.
-4. Run `node node_modules/typescript/bin/tsc --noEmit` and `node --import tsx --test tests/mapping.test.ts`, then generate a fresh workbook and check it in Excel's Print Preview. Rebuild the deployed API for a template change (`docker compose up -d --build api`); existing downloads stay as generated.
+4. Run `node node_modules/typescript/bin/tsc --noEmit` and `node --import tsx --test tests/mapping.test.ts`, then generate a fresh workbook and check it in Excel's Print Preview. Rebuild the deployed API for a template change (`docker compose up -d --build api`); existing complete dates are regenerated when marked complete again.
 
 ### Rebuilding the legacy template
 
@@ -177,7 +177,7 @@ The initial bundled template was prepared from the source BIFF cells, styles, di
 
 - Only text-based PDFs are supported. Scanned and password-protected PDFs need an original/unlocked copy.
 - Defaults: 20 files, 20 MB each, 100 MB per batch, and 100 pages per file. When increasing the batch limit, also increase Nginx's `client_max_body_size` in `deploy/nginx.conf`.
-- Morning batches offer one workbook of valid orders alongside review errors. Retry reprocesses unsuccessful pages and rebuilds the morning workbook without double-counting. Night batches keep valid orders for the next morning; they show no Excel download yet.
+- Uploads save valid orders under their printed dates alongside any review errors. Retry reprocesses unsuccessful pages and updates date drafts without double counting. Incomplete dates have no downloadable Excel.
 - “Unable to start processing”: verify the workflow is published, network/service names resolve, and the service secret matches.
 - “No response from processing”: inspect n8n execution logs; fix the model/connection issue, then retry. The timeout defaults to 15 minutes without page progress.
 - A review error caused by incorrect source data requires a corrected upload; the pilot does not include an in-browser editor.

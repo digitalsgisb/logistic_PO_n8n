@@ -11,7 +11,6 @@ import { orders, pageFor, pdfFor, textFor } from './helpers.ts';
 import { Store } from '../server/store.ts';
 import { Engine } from '../server/engine.ts';
 import { config } from '../server/config.ts';
-import { dispatchSession } from '../server/dispatch.ts';
 
 test('four sample orders produce one daily sheet with nine quantities and PO numbers in Remarks', async () => {
   const pages = orders.map((o, i) => ({ ...pageFor(o, String(i)), number: i + 1 }));
@@ -240,7 +239,8 @@ test('different delivery sequences across pages of one order require review', ()
   q.text = q.text.replace('2026090301', '2026090302');
   const result = assemble([p, q]);
   assert.equal(result.orders.length, 0);
-  assert.match(result.errors[0].error!, /Conflicting versions or delivery details/);
+  assert.equal(result.errors.length, 2);
+  assert.ok(result.errors.every((error) => /Missing pages/.test(error.error!)));
 });
 test('unknown/conflicting destinations cannot receive a guessed suffix', () => {
   for (const value of ['ASSB UNKNOWN', 'ASSB SHAH ALAM BKT RAJA']) assert.throws(() => destination(value));
@@ -288,86 +288,43 @@ test('a printed zero order is omitted from review and output', () => {
   assert.equal(isZeroOrder(p.text), true);
   assert.deepEqual(assemble([p]), { orders: [], errors: [] });
 });
-test('a later trip workbook includes validated orders from an earlier batch once', async () => {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'toyota-cumulative-'));
+test('date ledger combines uploads by printed date and releases only after confirmation', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'toyota-ledger-'));
   const store = new Store(dir);
   try {
-    const first = pageFor(orders[0], 'first');
-    const second = pageFor(orders[2], 'second');
-    second.state = 'extracting';
-    second.extraction = undefined;
-    const base = { dispatch_shift: 'morning' as const, stage: 'test', attempt: 'test', created_at: '2026-09-03T00:00:00Z', updated_at: '2026-09-03T00:00:00Z', files: [], results: [] };
-    store.save({ ...base, id: 'earlier', state: 'completed', pages: [first] });
-    const current = store.save({ ...base, id: 'latest', state: 'processing', pages: [first, second] });
-    await fs.mkdir(path.join(dir, 'latest'));
     const engine = new Engine(store, { ...config, dataDir: dir });
-    const misread = structuredClone(orders[2]);
-    misread.delivery_date = '2026-09-04';
-    misread.items[0].total_quantity = 30;
-    engine.result(current.id, current.attempt, second.id, misread);
-    assert.equal(store.get('latest')!.pages[1].extraction!.delivery_date, '2026-09-03');
-    assert.deepEqual(store.get('latest')!.pages[1].extraction!.items, orders[2].items);
-    await engine.finish(store.get('latest')!);
-    const ready = store.get('latest')!.results.find((result) => result.status === 'ready')!;
-    assert.equal(ready.order_count, 2);
-    assert.deepEqual(ready.order_numbers, ['SGIS12AA0747-SA', 'SGIS12DA3252-SA']);
+    const first = assemble([pageFor(orders[0], 'first')]).orders;
+    const second = assemble([pageFor(orders[2], 'second')]).orders;
+    await engine.ledger.ingest(first);
+    assert.equal(store.getDate('2026-09-03')!.status, 'open');
+    assert.equal(store.getDate('2026-09-03')!.orders.length, 1);
+    assert.throws(() => engine.ledger.download('2026-09-03'));
+    await engine.ledger.ingest(second);
+    assert.equal(store.getDate('2026-09-03')!.orders.length, 2);
+    const nextDatePage = pageFor({ ...structuredClone(orders[1]), delivery_date: '2026-09-04' }, 'next-date');
+    nextDatePage.text = nextDatePage.text.replaceAll('20260903', '20260904').replaceAll('03/09/2026', '04/09/2026');
+    const mixed = assemble([pageFor(orders[0], 'mixed-first'), nextDatePage]);
+    assert.equal(mixed.errors.length, 0);
+    await engine.ledger.ingest(mixed.orders);
+    assert.equal(store.getDate('2026-09-03')!.orders.length, 2);
+    assert.equal(store.getDate('2026-09-04')!.orders.length, 1);
+    await engine.ledger.setComplete('2026-09-03', true);
+    const file = engine.ledger.download('2026-09-03').path;
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.readFile(ready.path!);
+    await workbook.xlsx.readFile(file);
     assert.equal(workbook.worksheets[0].getCell('V13').value, 1200);
     assert.equal(workbook.worksheets[0].getCell('AE16').value, 'SGIS12DA3252-SA');
-  } finally {
-    store.close();
-    await fs.rm(dir, { recursive: true, force: true });
-  }
-});
-test('Friday night waits, then joins Monday morning under Monday upload date', async () => {
-  assert.deepEqual(dispatchSession('2026-09-25T10:00:00Z', 'morning'), { date: '2026-09-25', shift: 'morning' });
-  assert.deepEqual(dispatchSession('2026-09-25T01:00:00Z', 'evening'), { date: '2026-09-25', shift: 'evening' });
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'toyota-shifts-'));
-  const store = new Store(dir);
-  try {
-    const engine = new Engine(store, { ...config, dataDir: dir });
-    const dated = (order: typeof orders[number], id: string, date: string) => {
-      const extraction = { ...structuredClone(order), delivery_date: date };
-      const page = pageFor(extraction, id);
-      page.text = page.text.replaceAll('20260903', date.replaceAll('-', '')).replaceAll('03/09/2026',
-        date.split('-').reverse().join('/'));
-      return page;
-    };
-    const run = async (id: string, created_at: string, dispatch_shift: 'morning' | 'evening', pages: ReturnType<typeof pageFor>[]) => {
-      await fs.mkdir(path.join(dir, id));
-      const job = store.save({ id, dispatch_shift, state: 'processing', stage: 'test', attempt: id,
-        created_at, updated_at: created_at, files: [], pages, results: [] });
-      await engine.finish(job);
-      return store.get(id)!;
-    };
-    const friday = await run('friday-morning', '2026-09-25T00:00:00Z', 'morning',
-      [dated(orders[0], 'friday', '2026-09-25')]);
-    assert.equal(friday.results[0].date, '2026-09-25');
-    const evening = await run('friday-evening', '2026-09-25T01:00:00Z', 'evening',
-      [dated(orders[2], 'evening', '2026-09-25')]);
-    assert.equal(evening.state, 'completed');
-    assert.equal(evening.results.length, 0);
-    assert.match(evening.stage, /next morning/);
-    const monday = await run('monday-morning', '2026-09-28T10:00:00Z', 'morning',
-      [dated(orders[0], 'repeated-friday', '2026-09-25'), dated(orders[1], 'monday', '2026-09-28')]);
-    const ready = monday.results.find((result) => result.status === 'ready')!;
-    assert.equal(monday.state, 'completed');
-    assert.equal(ready.date, '2026-09-28');
-    assert.equal(ready.order_count, 2);
-    assert.match(store.get('friday-evening')!.stage, /Night orders included in the morning Excel dated 28\/09\/2026/);
-    assert.deepEqual(ready.order_numbers, ['SGIS12DA3252-SA', 'SGIS12DA3251-SA']);
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.readFile(ready.path!);
-    const sheet = workbook.worksheets[0];
-    assert.equal(sheet.getCell('F4').value, 'DATE : 28/09/2026');
-    assert.equal(sheet.getCell('AE13').value, 'SGIS12DA3251-SA');
-    assert.equal(sheet.getCell('AE16').value, 'SGIS12DA3252-SA');
-    const repeated = await run('tuesday-repeat', '2026-09-29T10:00:00Z', 'morning',
-      [dated(orders[0], 'repeated-again', '2026-09-25')]);
-    assert.equal(repeated.state, 'completed');
-    assert.equal(repeated.results.length, 0);
-    assert.match(repeated.stage, /already in an earlier morning Excel/);
+    await engine.ledger.ingest(second);
+    assert.equal(store.getDate('2026-09-03')!.status, 'complete');
+    const changed = structuredClone(second[0]);
+    changed.items[0].total_quantity += changed.items[0].pack_size;
+    changed.items[0].kanban_count += 1;
+    await engine.ledger.ingest([changed]);
+    assert.equal(store.getDate('2026-09-03')!.status, 'open');
+    assert.equal(store.getDate('2026-09-03')!.reopened_reason, 'new_po');
+    assert.throws(() => engine.ledger.download('2026-09-03'));
+    await engine.ledger.setComplete('2026-09-03', true);
+    assert.equal(store.getDate('2026-09-03')!.orders.length, 2);
   } finally {
     store.close();
     await fs.rm(dir, { recursive: true, force: true });
@@ -382,6 +339,31 @@ test('identical pages deduplicate but conflicting versions require review', () =
   copy.text = textFor(copy.extraction!);
   assert.equal(assemble([p, copy]).orders.length, 0);
   assert.equal(assemble([p, copy]).errors.length, 1);
+});
+test('same PO identifier on different printed dates becomes separate date orders', () => {
+  const first = pageFor(orders[0], 'date-one');
+  const second = pageFor({ ...structuredClone(orders[0]), delivery_date: '2026-09-04' }, 'date-two');
+  second.text = second.text.replaceAll('20260903', '20260904').replaceAll('03/09/2026', '04/09/2026');
+  const result = assemble([first, second]);
+  assert.equal(result.errors.length, 0);
+  assert.deepEqual(result.orders.map((order) => order.delivery_date).sort(), ['2026-09-03', '2026-09-04']);
+});
+test('same PO identifier can be saved separately for two trips on one date', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'toyota-two-trips-'));
+  const store = new Store(dir);
+  try {
+    const first = pageFor(orders[0], 'trip-one');
+    const second = pageFor(orders[0], 'trip-two');
+    second.text = second.text.replaceAll('2026090301', '2026090302');
+    const result = assemble([first, second]);
+    assert.equal(result.errors.length, 0);
+    assert.deepEqual(result.orders.map((order) => order.trip), [1, 2]);
+    await new Engine(store, { ...config, dataDir: dir }).ledger.ingest(result.orders);
+    assert.equal(store.getDate('2026-09-03')!.orders.length, 2);
+  } finally {
+    store.close();
+    await fs.rm(dir, { recursive: true, force: true });
+  }
 });
 test('multi-page orders merge matching items; missing/failed pages block the order', () => {
   const a = structuredClone(orders[0]),
