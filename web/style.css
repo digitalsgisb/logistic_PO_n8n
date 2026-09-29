@@ -662,15 +662,20 @@ html.has-switched-workspace .tagging-panel { animation: none; }
   body.printing-tags #root,
   body.printing-tags .app,
   body.printing-tags main,
+  body.printing-tags .workspace-pane,
   body.printing-tags .tagging-panel {
     display: block !important;
     margin: 0 !important;
     padding: 0 !important;
     border: 0 !important;
     width: 100% !important;
+    animation: none !important;
+    transform: none !important;
   }
+  /* Keep every ancestor of the tag sheets visible, including the workspace wrapper. */
   body.printing-tags .app > :not(main),
-  body.printing-tags main > :not(.tagging-panel),
+  body.printing-tags main > :not(.workspace-pane):not(.tagging-panel),
+  body.printing-tags .workspace-pane > :not(.tagging-panel),
   body.printing-tags .tagging-panel > :not(.tag-print-output) {
     display: none !important;
   }

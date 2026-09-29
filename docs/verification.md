@@ -4,6 +4,12 @@ Verified on 4 September 2026 with Node 24.12.0 on Windows.
 
 ## Completed checks
 
+### Blank tagging print preview — 29 September 2026
+
+- The print stylesheet hid every direct child of `main` except `.tagging-panel`. Since the separate order-history view added `.workspace-pane` around the tagging panel, printing hid the entire tag packet. Updated the print rules to retain that wrapper and hide its non-tagging children. Disabled ancestor animations and transforms during printing to keep page layout stable.
+- A headless Chrome layout check using the actual stylesheet and representative workspace markup reproduced hidden sheets with the original CSS. With the fix, three sample tag images were visible and generated exactly three A4 PDF pages; navigation, upload, review, confirmation controls, and order history were hidden. Returning to screen media restored the interface and hid the print packet.
+- This check used synthetic tag artwork, not a live customer PDF or physical printer. The full app build and existing automated suite were not run because npm was unavailable in the environment.
+
 ### Separate order history view — 29 September 2026
 
 - Moved **Orders by date** from the dispatch review area to its own sidebar view. The dispatch screen keeps a small link to the date view, and the date view has a return button for mobile screens. The active dispatch workflow stays mounted when switching views so selected files and tagging review are preserved.
