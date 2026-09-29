@@ -23,6 +23,7 @@ export class Store {
       PRAGMA foreign_keys=ON;
       CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, payload TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS dispatch_dates (date TEXT PRIMARY KEY, payload TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS users (
         username TEXT PRIMARY KEY COLLATE NOCASE,
         password_hash TEXT NOT NULL,
@@ -153,6 +154,23 @@ export class Store {
   allDates(): DispatchDate[] {
     return this.db.prepare('SELECT payload FROM dispatch_dates ORDER BY date DESC').all()
       .map((row) => JSON.parse(String(row.payload)));
+  }
+  clearHistoryRows() {
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      this.db.exec('DELETE FROM dispatch_dates; DELETE FROM jobs; COMMIT');
+    } catch (error) {
+      this.db.exec('ROLLBACK');
+      throw error;
+    }
+  }
+  getMeta(key: string): string | undefined {
+    const row = this.db.prepare('SELECT value FROM app_meta WHERE key=?').get(key);
+    return row ? String(row.value) : undefined;
+  }
+  setMeta(key: string, value: string) {
+    this.db.prepare('INSERT INTO app_meta VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value')
+      .run(key, value);
   }
   close() {
     this.db.close();

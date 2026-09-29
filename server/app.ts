@@ -47,17 +47,20 @@ export async function buildApp(options = config) {
     engine = new Engine(store, options);
   // Bring retained uploads from the previous shift-based release into the new
   // date board once. Their old job downloads remain available while retained.
-  if (!store.allDates().length) {
-    for (const job of store.all().filter((entry) => ['completed', 'partial'].includes(entry.state))) {
-      const orders = assemble(job.pages).orders;
-      if (orders.length) {
-        try {
-          await engine.ledger.ingest(orders);
-        } catch (error) {
-          app.log.error({ err: error, job: job.id }, 'Could not migrate retained PO upload');
+  if (store.getMeta('date-ledger-import-v1') !== 'done') {
+    if (!store.allDates().length) {
+      for (const job of store.all().filter((entry) => ['completed', 'partial'].includes(entry.state))) {
+        const orders = assemble(job.pages).orders;
+        if (orders.length) {
+          try {
+            await engine.ledger.ingest(orders);
+          } catch (error) {
+            app.log.error({ err: error, job: job.id }, 'Could not migrate retained PO upload');
+          }
         }
       }
     }
+    store.setMeta('date-ledger-import-v1', 'done');
   }
   store.ensureBootstrapUser(options.username, options.password);
   await app.register(cookie);
@@ -190,6 +193,7 @@ export async function buildApp(options = config) {
     return { ok: true };
   });
   app.post('/api/jobs', async (req, reply) => {
+    if (engine.clearing) return reply.code(503).send({ error: 'History is being cleared. Try again shortly.' });
     const id = randomUUID(),
       dir = path.join(options.dataDir, id);
     await fs.mkdir(dir, { recursive: true });
@@ -269,6 +273,10 @@ export async function buildApp(options = config) {
   app.post<{ Params: { date: string } }>('/api/dispatch-dates/:date/reopen', async (req) =>
     engine.ledger.publicEntry(await engine.ledger.setComplete(req.params.date, false)),
   );
+  app.delete('/api/history', async (req) => {
+    admin(req as typeof req & AuthenticatedRequest);
+    return { ok: true, ...(await engine.clearHistory()) };
+  });
   app.get<{ Params: { date: string } }>('/api/dispatch-dates/:date/workbook', async (req, reply) => {
     const output = engine.ledger.download(req.params.date);
     reply

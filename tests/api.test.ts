@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { createHmac } from 'node:crypto';
+import { createHmac, randomUUID } from 'node:crypto';
 import { buildApp } from '../server/app.ts';
 import { config } from '../server/config.ts';
 import { orders, pdfFor, textFor } from './helpers.ts';
@@ -88,6 +88,11 @@ test('accounts and persistent sessions survive an application restart', async ()
       (await second.app.inject({ url: '/api/accounts', headers: { cookie: operatorCookie } })).statusCode,
       403,
     );
+    assert.equal(
+      (await second.app.inject({ method: 'DELETE', url: '/api/history',
+        headers: { cookie: operatorCookie, 'x-requested-with': 'ToyotaPO' } })).statusCode,
+      403,
+    );
     const changed = await second.app.inject({
       method: 'POST',
       url: '/api/account/password',
@@ -162,6 +167,25 @@ test('upload needs no shift; dates remain hidden until completion and survive jo
     const reopened = await app.inject({ method: 'POST', url: '/api/dispatch-dates/2026-09-03/reopen', headers });
     assert.equal(reopened.json().status, 'open');
     assert.equal((await app.inject({ url: '/api/dispatch-dates/2026-09-03/workbook', headers })).statusCode, 404);
+    assert.equal((await app.inject({ method: 'DELETE', url: '/api/history',
+      headers: { 'x-requested-with': 'ToyotaPO' } })).statusCode, 401);
+    const historyId = randomUUID();
+    store.save({ ...old, id: historyId, state: 'queued' });
+    assert.equal((await app.inject({ method: 'DELETE', url: '/api/history', headers })).statusCode, 409);
+    store.save({ ...old, id: historyId, state: 'completed' });
+    await fs.mkdir(path.join(dir, historyId));
+    await fs.writeFile(path.join(dir, historyId, 'test.pdf'), 'test');
+    const cleared = await app.inject({ method: 'DELETE', url: '/api/history', headers });
+    assert.equal(cleared.statusCode, 200, cleared.body);
+    assert.equal(cleared.json().dates, 1);
+    assert.equal(cleared.json().uploads, 1);
+    assert.deepEqual(store.allDates(), []);
+    assert.deepEqual(store.all(), []);
+    assert.equal(store.getMeta('date-ledger-import-v1'), 'done');
+    assert.equal(store.getUser('pilot')?.username, 'pilot');
+    assert.equal((await app.inject({ url: '/api/session', headers })).statusCode, 200);
+    await assert.rejects(fs.stat(path.join(dir, historyId)));
+    await assert.rejects(fs.stat(path.join(dir, 'dispatch-dates', 'Toyota_2026-09-03_Combined.xlsx')));
   } finally {
     await app.close();
     await fs.rm(dir, { recursive: true, force: true });

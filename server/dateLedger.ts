@@ -98,6 +98,24 @@ export class DateLedger {
     });
   }
 
+  clearAll(jobIds: string[]) {
+    return this.serial(async () => {
+      const dates = this.store.allDates();
+      const dataRoot = path.resolve(this.dataDir) + path.sep;
+      const directories = jobIds.map((id) => {
+        const directory = path.resolve(this.dataDir, id);
+        if (!directory.startsWith(dataRoot) || !/^[A-Za-z0-9_-]+$/.test(id))
+          throw new Error('An invalid upload directory prevented clearing history.');
+        return directory;
+      });
+      const workbooks = dates.map((entry) => this.file(entry.date));
+      for (const directory of directories) await fs.rm(directory, { recursive: true, force: true });
+      for (const workbook of workbooks) await fs.rm(workbook, { force: true });
+      this.store.clearHistoryRows();
+      return { dates: dates.length, uploads: jobIds.length };
+    });
+  }
+
   publicEntry(entry: DispatchDate) {
     return {
       date: entry.date,

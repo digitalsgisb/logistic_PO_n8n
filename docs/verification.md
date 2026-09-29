@@ -4,6 +4,11 @@ Verified on 4 September 2026 with Node 24.12.0 on Windows.
 
 ## Completed checks
 
+### History controls and sidebar — 29 September 2026
+
+- Added an administrator-only **Clear history** control for saved PO dates, workbooks, upload jobs, and source PDFs. It preserves users, sessions, and the template, and refuses to run during an active upload. A migration marker prevents deleted test dates from returning after a restart.
+- The date board now groups by year and offers a year filter plus newest, oldest, and waiting-first-within-year order. The sidebar uses a simpler operations/workspace hierarchy in the existing navy palette, and the brand subtitle is **Logistic Workspace**.
+
 ### Operator-confirmed delivery dates — 29 September 2026
 
 - The supplied PDS PDF has four nonzero orders dated 25 September and one dated 28 September, plus a zero-order page. The printed `YYYYMMDDNN` sequence supplies the date and trip.

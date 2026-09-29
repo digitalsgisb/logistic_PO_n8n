@@ -101,6 +101,8 @@ docker compose up -d --build
 
 Jobs, original uploads, extracted values, outputs, user accounts, and login sessions are stored in the `toyota-data` volume. Back up that volume if required. Do not use `docker compose down -v` when keeping jobs or accounts. New application versions preserve the volume; interrupted work is marked retryable after restart. Files and job records expire after seven days by default; accounts and sessions do not.
 
+To remove pilot/test orders, sign in as an administrator and choose **Clear history** in **Orders by date**. Confirm the dialog to remove all saved PO dates, draft and released Excel files, upload jobs, and uploaded PDFs. Accounts, sign-in sessions, and the Excel template stay in place. Finish any running upload first. The date board groups cards by year; use **Year** and **Sort dates** to narrow or reorder the list.
+
 For the combined-output update, keep your working `.env`, Compose networking changes, and n8n workflow URLs. Only the application needs rebuilding. Existing job downloads remain available while retained. New uploads feed persistent date records; use **New batch** to add more POs. Retrying a partial job updates the affected date drafts without double counting.
 
 The trip-sequence correction and larger Remarks text require rebuilding the **API**, which generates the workbook; rebuilding only `web` will not apply them. Run `docker compose up -d --build` after pulling, then start a new batch and upload the PDFs again. The API reads the printed delivery sequence from the saved PDF text, so the existing n8n workflow and extraction schema remain compatible. The bundled prompt now clarifies the distinction between route and trip, but reimporting the workflow is not required for this fix.

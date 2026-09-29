@@ -30,6 +30,8 @@ export function Workflow({
   restart,
   retry,
   maxMb,
+  canClearHistory,
+  onHistoryCleared,
 }: {
   files: File[];
   job: Job | null;
@@ -41,6 +43,8 @@ export function Workflow({
   restart: () => void;
   retry: () => void;
   maxMb: number;
+  canClearHistory: boolean;
+  onHistoryCleared: () => void;
 }) {
   const [mode, setMode] = useState('both'),
     [tag, setTag] = useState<File>(),
@@ -264,7 +268,7 @@ export function Workflow({
               {r.order_id}: {r.error}
             </p>
           ))}
-        <DateBoard refreshKey={job?.id + ':' + job?.state} />
+        <DateBoard refreshKey={job?.id + ':' + job?.state} canClearHistory={canClearHistory} onHistoryCleared={onHistoryCleared} />
         {done && ['partial', 'failed', 'interrupted'].includes(job!.state) && (
           <button className="outline" onClick={retry}>
             Retry unsuccessful POs

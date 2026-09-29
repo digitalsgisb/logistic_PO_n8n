@@ -10,7 +10,7 @@ function BrandLockup() {
       <img className="company-mark" src={companyMark} alt="Sugihara Grand Industries" />
       <span className="brand-workspace">
         <strong>Logistic Digital</strong>
-        <span className="brand-sub">Logistics document workspace</span>
+        <span className="brand-sub">Logistic Workspace</span>
       </span>
     </span>
   );
@@ -82,6 +82,8 @@ function Icon({ name, size = 22 }: { name: string; size?: number }) {
         </>
       ) : name === 'check' ? (
         <path d="m5 12 4 4L19 6" />
+      ) : name === 'user' ? (
+        <><circle cx="12" cy="8" r="3" /><path d="M5 20c0-4 2.7-6 7-6s7 2 7 6" /></>
       ) : name === 'arrow' ? (
         <path d="M3 12h18m-6-6 6 6-6 6" />
       ) : name === 'grid' ? (
@@ -311,7 +313,8 @@ function App() {
     [username, setUsername] = useState('pilot'),
     [loginBusy, setLoginBusy] = useState(false),
     [retryBusy, setRetryBusy] = useState(false),
-    [accountOpen, setAccountOpen] = useState(false);
+    [accountOpen, setAccountOpen] = useState(false),
+    [historyGeneration, setHistoryGeneration] = useState(0);
   useEffect(() => {
     api('/api/session')
       .then(setSession)
@@ -529,34 +532,44 @@ function App() {
         <a className="brand" href="/" aria-label="Logistic Digital home">
           <BrandLockup />
         </a>
-        <p className="nav-label">WORKSPACE</p>
-        <a className="nav-active" href="#workflow-upload">
-          <Icon name="grid" />
-          <span>Daily dispatch</span>
-          <span className="nav-dot" />
-        </a>
-        <a className="nav-active tag-nav" href="#workflow-review">
-          <Icon name="file" />
-          <span>Review & print</span>
-        </a>
-        <div className="sidebar-note">
-          <div className="side-rule" />
-          <span className="eyebrow">LOGISTIC DIGITAL</span>
-          <div className="plant-tags">
-            <span>Shah Alam</span>
-            <span>Bukit Raja</span>
+        <nav className="sidebar-nav" aria-label="Workspace navigation">
+          <div className="sidebar-nav-group">
+            <p className="nav-label">OPERATIONS</p>
+            <a className="sidebar-link is-current" href="#workflow-upload">
+              <Icon name="grid" />
+              <span>Daily dispatch</span>
+              <span className="sidebar-chevron" aria-hidden="true">›</span>
+            </a>
+            <a className="sidebar-link" href="#workflow-review">
+              <Icon name="file" />
+              <span>Review & print</span>
+              <span className="sidebar-chevron" aria-hidden="true">›</span>
+            </a>
           </div>
-        </div>
+          <div className="sidebar-nav-group">
+            <p className="nav-label">WORKSPACE</p>
+            <button className="sidebar-link sidebar-account" onClick={() => setAccountOpen(true)}>
+              <Icon name="user" />
+              <span>Account settings</span>
+              <span className="sidebar-chevron" aria-hidden="true">›</span>
+            </button>
+          </div>
+        </nav>
         <div className="sidebar-bottom">
-          <div className="processing-label">
-            <span className="status-dot" />
-            Local AI processing
+          <div className="sidebar-card">
+            <strong>Logistic Workspace</strong>
+            <span>Shah Alam · Bukit Raja</span>
+            <div className="processing-label">
+              <span className="status-dot" />
+              Local AI processing
+            </div>
           </div>
           <UnitMark />
         </div>
       </aside>
       <main>
         <Workflow
+          key={historyGeneration}
           files={files}
           job={job}
           busy={busy || retryBusy}
@@ -575,6 +588,14 @@ function App() {
             } finally {
               setRetryBusy(false);
             }
+          }}
+          canClearHistory={session.isAdmin}
+          onHistoryCleared={() => {
+            setJob(null);
+            setFiles([]);
+            setError('');
+            localStorage.removeItem('toyota_job');
+            setHistoryGeneration((value) => value + 1);
           }}
         />
       </main>

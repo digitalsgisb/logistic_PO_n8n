@@ -10,6 +10,7 @@ import type { Job, Extraction } from './types.ts';
 const running = new Set(['reading', 'processing', 'generating']);
 export class Engine {
   busy = false;
+  clearing = false;
   ledger: DateLedger;
   constructor(
     public store: Store,
@@ -26,7 +27,7 @@ export class Engine {
       }
   }
   async tick() {
-    if (this.busy) return;
+    if (this.busy || this.clearing) return;
     this.busy = true;
     try {
       const jobs = this.store.all();
@@ -222,6 +223,17 @@ export class Engine {
     job.attempt = randomUUID();
     this.store.save(job);
     return job;
+  }
+  async clearHistory() {
+    if (this.busy || this.clearing || this.store.all().some((job) =>
+      ['queued', 'reading', 'processing', 'generating'].includes(job.state)))
+      throw Object.assign(new Error('Wait for current uploads to finish before clearing history.'), { statusCode: 409 });
+    this.clearing = true;
+    try {
+      return await this.ledger.clearAll(this.store.all().map((job) => job.id));
+    } finally {
+      this.clearing = false;
+    }
   }
 }
 export function publicJob(job: Job) {
