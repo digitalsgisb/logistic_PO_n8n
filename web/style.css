@@ -152,6 +152,25 @@
 }
 .workflow-review .orders-link { margin-top: 18px; }
 .date-page .page-heading { margin-bottom: 12px; }
+.workspace-pane:not([hidden]),
+.date-page {
+  animation: section-enter 260ms cubic-bezier(.22, 1, .36, 1) both;
+}
+@keyframes section-enter {
+  from { opacity: .7; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+html.native-workspace-transitions .workspace-pane,
+html.native-workspace-transitions .date-page { animation: none; }
+html.has-switched-workspace .workflow-upload,
+html.has-switched-workspace .workflow-review,
+html.has-switched-workspace .tagging-panel { animation: none; }
+::view-transition-old(root),
+::view-transition-new(root) { animation: none; }
+::view-transition-old(workspace-content) { animation: 170ms ease-in both workspace-fade-out; }
+::view-transition-new(workspace-content) { animation: 250ms cubic-bezier(.22, 1, .36, 1) both workspace-fade-in; }
+@keyframes workspace-fade-out { to { opacity: 0; } }
+@keyframes workspace-fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 .workflow-workbooks {
   display: flex;
   gap: 12px;
@@ -1109,7 +1128,7 @@ svg {
   font-weight: 600;
   text-align: left;
   cursor: pointer;
-  transition: background .2s, color .2s;
+  transition: background 220ms ease, color 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
 }
 .sidebar-link svg {
   color: #a9c4e8;
@@ -1208,6 +1227,7 @@ main {
   margin: 0 auto;
   padding: 24px 32px;
 }
+.app main { view-transition-name: workspace-content; }
 .app main :is(button, input, a, summary) {
   scroll-margin-block: calc(var(--header-height) + 16px);
 }
@@ -2072,6 +2092,10 @@ h3 {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root),
+  ::view-transition-old(workspace-content),
+  ::view-transition-new(workspace-content) { animation: none !important; }
   .workflow-upload::details-content,
   .tag-page-details::details-content {
     transition: none !important;

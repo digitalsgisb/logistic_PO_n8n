@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import './style.css';
 import companyMark from './assets/sugihara-mark.png';
@@ -321,13 +322,25 @@ function App() {
     [section, setSection] = useState<'dispatch' | 'review' | 'dates'>(() =>
       sessionStorage.getItem('toyota_section') === 'dates' ? 'dates' : 'dispatch');
   const showSection = (next: 'dispatch' | 'review' | 'dates') => {
-    setSection(next);
     sessionStorage.setItem('toyota_section', next);
-    requestAnimationFrame(() => {
-      if (next === 'dates') window.scrollTo({ top: 0, behavior: 'smooth' });
+    const moveToSection = (behavior: ScrollBehavior) => {
+      if (next === 'dates') window.scrollTo({ top: 0, behavior });
       else document.getElementById(next === 'review' ? 'workflow-review' : 'workflow-upload')
-        ?.scrollIntoView({ block: 'start', behavior: 'smooth' });
-    });
+        ?.scrollIntoView({ block: 'start', behavior });
+    };
+    const changesPage = (section === 'dates') !== (next === 'dates');
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (changesPage) document.documentElement.classList.add('has-switched-workspace');
+    if (changesPage && !reducedMotion && document.startViewTransition) {
+      document.documentElement.classList.add('native-workspace-transitions');
+      document.startViewTransition(() => {
+        flushSync(() => setSection(next));
+        moveToSection('instant' as ScrollBehavior);
+      });
+    } else {
+      setSection(next);
+      requestAnimationFrame(() => moveToSection(changesPage || reducedMotion ? 'instant' as ScrollBehavior : 'smooth'));
+    }
   };
   useEffect(() => {
     api('/api/session')
@@ -587,7 +600,7 @@ function App() {
         </div>
       </aside>
       <main>
-        <div hidden={section === 'dates'}>
+        <div className="workspace-pane" hidden={section === 'dates'}>
           <Workflow
             key={historyGeneration}
             files={files}

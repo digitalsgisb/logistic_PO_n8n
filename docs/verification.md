@@ -7,6 +7,7 @@ Verified on 4 September 2026 with Node 24.12.0 on Windows.
 ### Separate order history view — 29 September 2026
 
 - Moved **Orders by date** from the dispatch review area to its own sidebar view. The dispatch screen keeps a small link to the date view, and the date view has a return button for mobile screens. The active dispatch workflow stays mounted when switching views so selected files and tagging review are preserved.
+- Switching between the two views uses a short fade and rise in Chrome, with a CSS fallback. In-page navigation keeps smooth scrolling. Reduced-motion preference disables the transition.
 
 ### Sidebar sizing and scroll — 29 September 2026
 
