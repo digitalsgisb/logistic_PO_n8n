@@ -4,6 +4,10 @@ Verified on 4 September 2026 with Node 24.12.0 on Windows.
 
 ## Completed checks
 
+### Separate order history view — 29 September 2026
+
+- Moved **Orders by date** from the dispatch review area to its own sidebar view. The dispatch screen keeps a small link to the date view, and the date view has a return button for mobile screens. The active dispatch workflow stays mounted when switching views so selected files and tagging review are preserved.
+
 ### Sidebar sizing and scroll — 29 September 2026
 
 - The sidebar now keeps the brand and DTU footer in place while its navigation scrolls with a thin navy scrollbar. Type and spacing were reduced slightly across the workspace, and the DTU label is kept on one line. TypeScript checking and the production web build passed.

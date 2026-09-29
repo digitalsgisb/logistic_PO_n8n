@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import './style.css';
 import companyMark from './assets/sugihara-mark.png';
 import { Workflow } from './Workflow';
+import { DateBoard } from './DateBoard';
 
 function BrandLockup() {
   return (
@@ -84,6 +85,8 @@ function Icon({ name, size = 22 }: { name: string; size?: number }) {
         <path d="m5 12 4 4L19 6" />
       ) : name === 'user' ? (
         <><circle cx="12" cy="8" r="3" /><path d="M5 20c0-4 2.7-6 7-6s7 2 7 6" /></>
+      ) : name === 'calendar' ? (
+        <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M7 3v4M17 3v4M3 10h18M8 14h3M14 14h3" /></>
       ) : name === 'arrow' ? (
         <path d="M3 12h18m-6-6 6 6-6 6" />
       ) : name === 'grid' ? (
@@ -314,7 +317,18 @@ function App() {
     [loginBusy, setLoginBusy] = useState(false),
     [retryBusy, setRetryBusy] = useState(false),
     [accountOpen, setAccountOpen] = useState(false),
-    [historyGeneration, setHistoryGeneration] = useState(0);
+    [historyGeneration, setHistoryGeneration] = useState(0),
+    [section, setSection] = useState<'dispatch' | 'review' | 'dates'>(() =>
+      sessionStorage.getItem('toyota_section') === 'dates' ? 'dates' : 'dispatch');
+  const showSection = (next: 'dispatch' | 'review' | 'dates') => {
+    setSection(next);
+    sessionStorage.setItem('toyota_section', next);
+    requestAnimationFrame(() => {
+      if (next === 'dates') window.scrollTo({ top: 0, behavior: 'smooth' });
+      else document.getElementById(next === 'review' ? 'workflow-review' : 'workflow-upload')
+        ?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    });
+  };
   useEffect(() => {
     api('/api/session')
       .then(setSession)
@@ -500,7 +514,7 @@ function App() {
         <nav className="header-context" aria-label="Breadcrumb">
           <span>Workspace</span>
           <Icon name="arrow" size={15} />
-          <strong>Logistic Digital</strong>
+          <strong>{section === 'dates' ? 'Orders by date' : 'Logistic Digital'}</strong>
         </nav>
         <div className="top-right">
           <span className="private-label">{session.username}</span>
@@ -535,16 +549,21 @@ function App() {
         <nav className="sidebar-nav" aria-label="Workspace navigation">
           <div className="sidebar-nav-group">
             <p className="nav-label">OPERATIONS</p>
-            <a className="sidebar-link is-current" href="#workflow-upload">
+            <button className={`sidebar-link${section === 'dispatch' ? ' is-current' : ''}`} onClick={() => showSection('dispatch')}>
               <Icon name="grid" />
               <span>Daily dispatch</span>
               <span className="sidebar-chevron" aria-hidden="true">›</span>
-            </a>
-            <a className="sidebar-link" href="#workflow-review">
+            </button>
+            <button className={`sidebar-link${section === 'review' ? ' is-current' : ''}`} onClick={() => showSection('review')}>
               <Icon name="file" />
               <span>Review & print</span>
               <span className="sidebar-chevron" aria-hidden="true">›</span>
-            </a>
+            </button>
+            <button className={`sidebar-link${section === 'dates' ? ' is-current' : ''}`} onClick={() => showSection('dates')}>
+              <Icon name="calendar" />
+              <span>Orders by date</span>
+              <span className="sidebar-chevron" aria-hidden="true">›</span>
+            </button>
           </div>
           <div className="sidebar-nav-group">
             <p className="nav-label">WORKSPACE</p>
@@ -568,36 +587,50 @@ function App() {
         </div>
       </aside>
       <main>
-        <Workflow
-          key={historyGeneration}
-          files={files}
-          job={job}
-          busy={busy || retryBusy}
-          error={error}
-          add={add}
-          remove={(i) => setFiles(files.filter((_, n) => n !== i))}
-          submit={submit}
-          restart={restart}
-          maxMb={session.limits.fileMb}
-          retry={async () => {
-            setRetryBusy(true);
-            try {
-              setJob(await api('/api/jobs/' + job!.id + '/retry', 'POST'));
-            } catch (e) {
-              setError((e as Error).message);
-            } finally {
-              setRetryBusy(false);
-            }
-          }}
-          canClearHistory={session.isAdmin}
-          onHistoryCleared={() => {
+        <div hidden={section === 'dates'}>
+          <Workflow
+            key={historyGeneration}
+            files={files}
+            job={job}
+            busy={busy || retryBusy}
+            error={error}
+            add={add}
+            remove={(i) => setFiles(files.filter((_, n) => n !== i))}
+            submit={submit}
+            restart={restart}
+            maxMb={session.limits.fileMb}
+            retry={async () => {
+              setRetryBusy(true);
+              try {
+                setJob(await api('/api/jobs/' + job!.id + '/retry', 'POST'));
+              } catch (e) {
+                setError((e as Error).message);
+              } finally {
+                setRetryBusy(false);
+              }
+            }}
+            openDates={() => showSection('dates')}
+          />
+        </div>
+        {section === 'dates' && <section className="date-page" id="orders-by-date">
+          <div className="page-heading">
+            <div>
+              <div className="eyebrow teal">ORDER HISTORY</div>
+              <h1>Saved orders</h1>
+              <p>Review each delivery date and release its Kanban Excel when the orders are complete.</p>
+            </div>
+            <button type="button" className="outline" onClick={() => showSection('dispatch')}>
+              ← Daily dispatch
+            </button>
+          </div>
+          <DateBoard refreshKey={job?.id + ':' + job?.state} canClearHistory={session.isAdmin} onHistoryCleared={() => {
             setJob(null);
             setFiles([]);
             setError('');
             localStorage.removeItem('toyota_job');
             setHistoryGeneration((value) => value + 1);
-          }}
-        />
+          }} />
+        </section>}
       </main>
       {accountOpen && <AccountPanel session={session} close={() => setAccountOpen(false)} />}
     </div>

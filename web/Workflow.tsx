@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Tagging } from './Tagging';
-import { DateBoard } from './DateBoard';
 type Result = {
   id: string;
   status: string;
@@ -30,8 +29,7 @@ export function Workflow({
   restart,
   retry,
   maxMb,
-  canClearHistory,
-  onHistoryCleared,
+  openDates,
 }: {
   files: File[];
   job: Job | null;
@@ -43,8 +41,7 @@ export function Workflow({
   restart: () => void;
   retry: () => void;
   maxMb: number;
-  canClearHistory: boolean;
-  onHistoryCleared: () => void;
+  openDates: () => void;
 }) {
   const [mode, setMode] = useState('both'),
     [tag, setTag] = useState<File>(),
@@ -268,7 +265,9 @@ export function Workflow({
               {r.order_id}: {r.error}
             </p>
           ))}
-        <DateBoard refreshKey={job?.id + ':' + job?.state} canClearHistory={canClearHistory} onHistoryCleared={onHistoryCleared} />
+        <button type="button" className="outline orders-link" onClick={openDates}>
+          Open Orders by date →
+        </button>
         {done && ['partial', 'failed', 'interrupted'].includes(job!.state) && (
           <button className="outline" onClick={retry}>
             Retry unsuccessful POs

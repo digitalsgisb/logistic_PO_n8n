@@ -150,6 +150,8 @@
 .workflow-review p {
   color: #607087;
 }
+.workflow-review .orders-link { margin-top: 18px; }
+.date-page .page-heading { margin-bottom: 12px; }
 .workflow-workbooks {
   display: flex;
   gap: 12px;
