@@ -19,7 +19,7 @@ test('614V and 614 tags share the one-copy rule and match validated PO quantitie
   const extraction = {
     ...page.extraction!,
     destination: 'BUKIT RAJA',
-    items: [{ ...page.extraction!.items[0], item_code: '614V' }],
+    items: [{ ...page.extraction!.items[0], item_code: '614V', pack_size: 60, total_quantity: 180 }],
   };
   const source = pageFor(extraction);
   const order = validatePage(source.extraction, source);
@@ -29,13 +29,39 @@ test('614V and 614 tags share the one-copy rule and match validated PO quantitie
   assert.equal(matched.copies, 3);
   assert.deepEqual(matched.notes, []);
   assert.deepEqual(matched.matchedOrders, [order.kb_number]);
-  assert.deepEqual(matched.lines, [{ code: '614', racks: 3, tagRacks: 3, multiplier: 1, copies: 3 }]);
+  assert.deepEqual(matched.lines, [{ code: '614', racks: 3, tagRacks: 3, multiplier: 1, pieces: 180, copies: 3 }]);
   assert.equal(tagsPerRack('BUKIT RAJA', '614V'), 1);
   assert.equal(tagsPerRack('SHAH ALAM', '614V'), 2);
   const standalone = analyseTagging([small(['614V']), rack()])[1];
   assert.equal(standalone.copies, 1);
-  assert.equal(standalone.notes.length, 1);
+  assert.equal(standalone.notes.length, 2);
   assert.match(standalone.notes[0], /No matching validated PO/);
+  assert.match(standalone.notes[1], /1 rack tag per 60 pcs/);
+});
+
+test('614 copies round up total PO pieces per cover, independently of kanban count', () => {
+  const base = validatePage(pageFor().extraction, pageFor());
+  const texts = [small(['614V']), rack()];
+  for (const code of ['614', '614V']) {
+    for (const [quantity, copies] of [[1, 1], [30, 1], [59, 1], [60, 1], [61, 2], [119, 2], [120, 2], [121, 3], [180, 3]]) {
+      const order = {
+        ...base, destination: 'BUKIT RAJA' as const, delivery_sequence: '2026090801',
+        items: [{ ...base.items[0], item_code: code, pack_size: quantity, kanban_count: 1, total_quantity: quantity }],
+      };
+      const page = analyseTagging(texts, [order])[1];
+      assert.equal(page.copies, copies, `${code}: ${quantity} pcs`);
+      assert.equal(page.lines[0].pieces, quantity);
+      assert.deepEqual(page.notes, []);
+    }
+  }
+  const order = {
+    ...base, destination: 'BUKIT RAJA' as const, delivery_sequence: '2026090801',
+    items: [{ ...base.items[0], item_code: '614', pack_size: 30, kanban_count: 1, total_quantity: 30 }],
+  };
+  const combined = analyseTagging([small(['614', '614V']), rack()], [order, { ...order, kb_number: 'SECOND-BR' }])[1];
+  assert.equal(combined.copies, 1, 'sum 30 + 30 pcs before rounding');
+  assert.equal(combined.lines[0].pieces, 60);
+  assert.deepEqual(combined.notes, []);
 });
 
 test('same-trip HOOK and carpet covers match separate printed identities and POs', () => {

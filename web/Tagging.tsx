@@ -9,7 +9,7 @@ type Page = {
   sequence: string;
   identity?: { dock?: string; lane?: string };
   copies: number;
-  lines: { code: string; racks: number; tagRacks?: number; multiplier: number; copies: number }[];
+  lines: { code: string; racks: number; tagRacks?: number; pieces?: number; multiplier: number; copies: number }[];
   notes: string[];
   matchedOrders: string[];
 };
@@ -366,7 +366,9 @@ export function Tagging({
                                         <td>{l.racks}</td>
                                         {!!p.matchedOrders.length && <td>{l.tagRacks}</td>}
                                         <td>
-                                          {p.place === 'SHAH ALAM' && l.code === 'HU83'
+                                          {l.pieces !== undefined
+                                            ? `1 per 60 pcs, rounded up (${l.pieces} pcs)`
+                                            : p.place === 'SHAH ALAM' && l.code === 'HU83'
                                             ? '2 total'
                                             : `${l.multiplier} per rack`}
                                         </td>
