@@ -12,6 +12,34 @@ import { Store } from '../server/store.ts';
 import { Engine } from '../server/engine.ts';
 import { config } from '../server/config.ts';
 
+test('614V source rows validate exactly and write quantities to the existing 614 column', async () => {
+  const extraction = structuredClone(orders[3]);
+  extraction.items = [{ ...extraction.items[0], item_code: '614V' }];
+  const page = pageFor(extraction);
+  assert.deepEqual(sourceItems(page.text), extraction.items);
+  const result = assemble([page]);
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.orders[0].items[0].item_code, '614');
+  assert.equal(page.extraction!.items[0].item_code, '614V');
+  assert.throws(() => validatePage({ ...extraction, items: [{ ...extraction.items[0], item_code: '614' }] }, page), /not found together/);
+  const wrongPlant = pageFor({ ...extraction, destination: 'SHAH ALAM' });
+  assert.throws(() => validatePage(wrongPlant.extraction, wrongPlant), /wrong plant section/);
+  const unknown = pageFor({ ...extraction, items: [{ ...extraction.items[0], item_code: '614X' }] });
+  assert.throws(() => validatePage(unknown.extraction, unknown), /Unknown item/);
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'toyota-614v-'));
+  try {
+    const file = path.join(dir, 'alias.xlsx');
+    await writeBatch(result.orders, 'templates/toyota.xlsx', file);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.readFile(file);
+    const sheet = wb.getWorksheet('ASSB2016')!;
+    assert.equal(String(sheet.getCell(8, headers['614'].column).value), '614');
+    assert.equal(sheet.getCell(16, headers['614'].column).value, extraction.items[0].total_quantity);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('four sample orders produce one daily sheet with nine quantities and PO numbers in Remarks', async () => {
   const pages = orders.map((o, i) => ({ ...pageFor(o, String(i)), number: i + 1 }));
   const result = assemble(pages);

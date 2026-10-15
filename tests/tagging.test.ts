@@ -14,6 +14,30 @@ const small = (codes: string[], place = 'BKT RAJA', sequence = '2026 0908 01') =
 const rack = (place = 'BKT RAJA', sequence = '2026090801') =>
   `ASSB ${place}\nORDER NUMBER\n${sequence}\nSKID NO. OF`;
 
+test('614V and 614 tags share the one-copy rule and match validated PO quantities', () => {
+  const page = pageFor();
+  const extraction = {
+    ...page.extraction!,
+    destination: 'BUKIT RAJA',
+    items: [{ ...page.extraction!.items[0], item_code: '614V' }],
+  };
+  const source = pageFor(extraction);
+  const order = validatePage(source.extraction, source);
+  assert.equal(order.items[0].item_code, '614');
+  const texts = [small(['614V', '614', '614V'], 'BKT RAJA', order.delivery_sequence), rack('BKT RAJA', order.delivery_sequence)];
+  const matched = analyseTagging(texts, [order])[1];
+  assert.equal(matched.copies, 3);
+  assert.deepEqual(matched.notes, []);
+  assert.deepEqual(matched.matchedOrders, [order.kb_number]);
+  assert.deepEqual(matched.lines, [{ code: '614', racks: 3, tagRacks: 3, multiplier: 1, copies: 3 }]);
+  assert.equal(tagsPerRack('BUKIT RAJA', '614V'), 1);
+  assert.equal(tagsPerRack('SHAH ALAM', '614V'), 2);
+  const standalone = analyseTagging([small(['614V']), rack()])[1];
+  assert.equal(standalone.copies, 1);
+  assert.equal(standalone.notes.length, 1);
+  assert.match(standalone.notes[0], /No matching validated PO/);
+});
+
 test('same-trip HOOK and carpet covers match separate printed identities and POs', () => {
   const smallAt = (codes: string[], supplier: string, dock: string, lane: string) =>
     `SUPPLIER\nDOCK CODE\nASSB SHAH ALAM\nSGIS SUGIHARA GRAND\n${dock}\n${supplier}\nMROSNo.(P/LANE)\nARRIVAL DATE\n08/09/26\n${lane}\n${small(codes, 'SHAH ALAM')}`;

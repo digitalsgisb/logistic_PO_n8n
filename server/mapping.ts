@@ -39,6 +39,10 @@ export const headers: Record<string, { column: number; destination: Destination 
   ].map((code, i) => [code, { column: i + 4, destination: i < 18 ? 'BUKIT RAJA' : 'SHAH ALAM' }]),
 );
 export const hash = (s: string | Uint8Array) => createHash('sha256').update(s).digest('hex');
+/** Printed 614V tags and POs use the template's 614 column and copy rule. */
+export function canonicalItemCode(code: string) {
+  return code === '614V' ? '614' : code;
+}
 export function isZeroOrder(text: string) {
   return /\bZERO ORDER\b/i.test(text) && /\bTOTAL\s+0\b/.test(text) && sourceOrderIds(text).length === 0;
 }
@@ -51,7 +55,7 @@ export function sourceItems(text: string): LineItem[] | undefined {
     if (!match) return undefined;
     const [, part_number, item_code, pack, kanbans, total] = match;
     const pack_size = Number(pack), kanban_count = Number(kanbans), total_quantity = Number(total);
-    if (!headers[item_code] || ![pack_size, kanban_count, total_quantity].every(Number.isSafeInteger) ||
+    if (!headers[canonicalItemCode(item_code)] || ![pack_size, kanban_count, total_quantity].every(Number.isSafeInteger) ||
         pack_size <= 0 || kanban_count <= 0 || total_quantity <= 0 ||
         pack_size * kanban_count !== total_quantity) return undefined;
     items.push({ part_number, item_code, pack_size, kanban_count, total_quantity });
@@ -152,7 +156,7 @@ export function validatePage(raw: unknown, page: Page): Order {
   for (const item of x.items) {
     if (typeof item.item_code !== 'string' || typeof item.part_number !== 'string')
       throw new Error('Invalid item identifiers.');
-    const map = headers[item.item_code];
+    const map = headers[canonicalItemCode(item.item_code)];
     if (!map || map.destination !== place)
       throw new Error(`Unknown item or wrong plant section: ${item.item_code}.`);
     for (const n of [item.pack_size, item.kanban_count, item.total_quantity])
@@ -179,6 +183,8 @@ export function validatePage(raw: unknown, page: Page): Order {
     throw new Error('Kanban total does not reconcile with the page TOTAL.');
   return {
     ...x,
+    // Preserve exact printed identifiers through source validation before normalising.
+    items: x.items.map((item) => ({ ...item, item_code: canonicalItemCode(item.item_code) })),
     delivery_date: date,
     destination: place,
     route,

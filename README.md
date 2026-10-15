@@ -156,6 +156,12 @@ Outputs go to `outputs/combined-live-sample/`. Without `--live`, the sample scri
 - Repeated order pages are deduplicated; missing pages and conflicting versions require review. Source orders remain separate in extraction records. Within one order, repeated matching items are summed only when part and pack details agree.
 - Matching source identifiers and numeric values is mandatory. Unknown destinations/codes/routes, ambiguous dates, missing items, and quantity discrepancies do not produce a ready workbook.
 
+### Printed 614V item codes
+
+Printed `614V` is accepted as an alias of the existing Bukit Raja `614` template item. PO rows still have to match their exact printed identifiers and quantities before the validated item code is normalised. Tagging combines `614V` and `614` rack counts, applies one copy per rack, and compares them with the same validated PO item. Other unknown codes and wrong destinations still require review. The no-matching-PO warning remains when the current batch has no matching validated order.
+
+After pulling this fix, rebuild the API with `docker compose up -d --build api`, then start a new batch and upload the PO and tagging PDF together to rerun validation.
+
 ### Editing the Excel template yourself
 
 1. Copy `templates/toyota.xlsx` as a backup. Open `templates/toyota.xlsx` in Microsoft Excel and edit the `ASSB2016` sheet. Save as `.xlsx` in the same location; keep the worksheet name.

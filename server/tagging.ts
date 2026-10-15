@@ -1,4 +1,4 @@
-import { destination, headers } from './mapping.ts';
+import { canonicalItemCode, destination, headers } from './mapping.ts';
 import type { Order } from './types.ts';
 import { taggingIdentity, compatibleIdentity } from './taggingIdentity.ts';
 
@@ -7,7 +7,7 @@ function copiesFor(place: string, code: string, racks: number) {
 }
 
 export function tagsPerRack(place: string, code: string) {
-  return (place === 'BUKIT RAJA' && code === '614') ||
+  return (place === 'BUKIT RAJA' && canonicalItemCode(code) === '614') ||
     (place === 'SHAH ALAM' && ['HU83', '238X', 'HU82'].includes(code))
     ? 1
     : 2;
@@ -18,7 +18,7 @@ export function analyseTagging(texts: string[], orders: Order[] = []) {
   return texts
     .map((text, index) => {
       const large = /SKID\s+NO/i.test(text) && /ORDER\s+NUMBER/i.test(text);
-      const items = [...text.matchAll(/\b([A-Z0-9]{3,4})\s+STORE\s+ADDRESS\b/g)].map((m) => m[1]);
+      const items = [...text.matchAll(/\b([A-Z0-9]{3,4})\s+STORE\s+ADDRESS\b/g)].map((m) => canonicalItemCode(m[1]));
       let place = '';
       try {
         place = destination(text);
@@ -98,8 +98,10 @@ export function analyseTagging(texts: string[], orders: Order[] = []) {
       page.matchedOrders = matching.map((o) => o.kb_number);
       if (matching.length) {
         const expected = new Map<string, number>();
-        for (const item of matching.flatMap((o) => o.items))
-          expected.set(item.item_code, (expected.get(item.item_code) ?? 0) + item.kanban_count);
+        for (const item of matching.flatMap((o) => o.items)) {
+          const code = canonicalItemCode(item.item_code);
+          expected.set(code, (expected.get(code) ?? 0) + item.kanban_count);
+        }
         // The validated PO's ORDER (KANBANS) is authoritative when available.
         page.lines = [...new Set([...expected.keys(), ...counts.keys()])].map((code) => {
           const count = expected.get(code) ?? 0;
