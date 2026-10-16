@@ -4,6 +4,8 @@ import { writeFile } from 'node:fs/promises';
 import type { Order } from './types.ts';
 import { headers } from './mapping.ts';
 
+const usesQtyRow = (code: string) => code === '614' || code === 'HU83';
+
 export function batchFilename(orders: Order[], workbookDate?: string) {
   if (workbookDate) return `Toyota_${workbookDate}_Combined.xlsx`;
   const dates = [...new Set(orders.map((order) => order.delivery_date))].sort();
@@ -69,17 +71,18 @@ export async function writeBatch(orders: Order[], template: string, destination:
           .sort((a, b) => a.kb_number.localeCompare(b.kb_number));
         if (!group.length) continue;
         const isHook = (order: Order) => order.items.some((item) => item.item_code === 'HU83');
-        // Each destination has an unmarked base PO. Give HOOK the first star when ambiguous.
-        const base = group.find((order) => !isHook(order)) ?? group[0];
+        // Only CBOX/HOOK may carry stars. Prefer an ordinary PO as the unmarked base.
+        const hasQtyPart = (order: Order) => order.items.some((item) => usesQtyRow(item.item_code));
+        const base = group.find((order) => !hasQtyPart(order)) ?? group.find((order) => !isHook(order)) ?? group[0];
         markersByOrder.set(base, '');
         group
-          .filter((order) => order !== base)
+          .filter((order) => order !== base && hasQtyPart(order))
           .sort((a, b) => Number(isHook(b)) - Number(isHook(a)))
           .forEach((order, index) => markersByOrder.set(order, '*'.repeat(index + 1)));
       }
       const markedOrders = tripOrders.map((order) => ({
         order,
-        marker: markersByOrder.get(order)!,
+        marker: markersByOrder.get(order) ?? '',
       }));
       const quantities = new Map<string, { part: string; total: number; markers: string[] }>();
       for (const { order, marker } of markedOrders)
@@ -93,27 +96,30 @@ export async function writeBatch(orders: Order[], template: string, destination:
           quantities.set(item.item_code, {
             part: item.part_number,
             total,
-            markers: [...(previous?.markers ?? []), marker],
+            markers: [...(previous?.markers ?? []), usesQtyRow(item.item_code) ? marker : ''],
           });
         }
       for (const [code, { total, markers }] of quantities) {
-        const cell = sheet.getCell(row, headers[code].column);
+        const targetRow = usesQtyRow(code) ? row : row + 1;
+        const cell = sheet.getCell(targetRow, headers[code].column);
         cell.value = total;
         // Template cells can share style objects; each quantity needs its own markers.
         cell.style = structuredClone(cell.style);
         cell.font = { ...cell.font, size: 22 };
         cell.alignment = { ...cell.alignment, wrapText: true, shrinkToFit: false };
         // A literal prefix in the number format keeps the underlying value numeric.
-        if (markers.length === 1) {
+        if (!usesQtyRow(code)) {
+          cell.numFmt = '0';
+        } else if (markers.length === 1) {
           cell.numFmt = markers[0] ? `"${markers[0]}"0` : '0';
         } else {
           const lines = markers.filter(Boolean);
           cell.numFmt = `0"\n${lines.join('\n')}"`;
-          sheet.getRow(row).height = Math.max(sheet.getRow(row).height ?? 15, (lines.length + 1) * 24 + 6);
+          sheet.getRow(targetRow).height = Math.max(sheet.getRow(targetRow).height ?? 15, (lines.length + 1) * 24 + 6);
         }
       }
 
-      // Use the three existing Remarks cells next to each trip; KB and DO rows stay blank.
+      // Use the three existing Remarks cells next to each trip.
       const numbers = markedOrders.map(({ order, marker }) =>
         marker ? `${marker} ${order.kb_number}` : order.kb_number,
       );
