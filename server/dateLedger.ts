@@ -133,10 +133,17 @@ export class DateLedger {
   }
 
   download(date: string) {
-    this.file(date);
-    const entry = this.store.getDate(date);
-    if (!entry || entry.status !== 'complete')
-      throw Object.assign(new Error('Mark this date complete before downloading its Excel.'), { statusCode: 404 });
-    return { path: this.file(date), filename: batchFilename(entry.orders) };
+    return this.serial(async () => {
+      this.file(date);
+      const entry = this.store.getDate(date);
+      if (!entry || entry.status !== 'complete')
+        throw Object.assign(new Error('Mark this date complete before downloading its Excel.'), { statusCode: 404 });
+      // Saved POs are authoritative. Rebuild even an old completed date using the
+      // current writer/template, without changing its completion or order history.
+      await this.write(entry);
+      // Read within the lock so concurrent downloads or history changes cannot
+      // replace/delete the file before the response has captured its contents.
+      return { path: this.file(date), filename: batchFilename(entry.orders), buffer: await fs.readFile(this.file(date)) };
+    });
   }
 }

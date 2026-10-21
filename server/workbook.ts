@@ -73,18 +73,25 @@ export async function writeBatch(orders: Order[], template: string, destination:
     sheet.pageSetup.fitToHeight = 1;
     sheet.pageSetup.printArea = `A4:AE${42 + addedRows}`;
     sheet.pageSetup.margins = { left: 0.1, right: 0.1, top: 0.1, bottom: 0.1, header: 0, footer: 0 };
-    // The template was designed for a much larger print sheet. Increase its text
-    // slightly so labels remain readable after Excel scales the grid onto A4.
+    // Balance the template's narrow columns against the text size. Enlarging all
+    // fonts caused clipped part descriptions, wrapped trip labels and ### quantities.
+    sheet.getColumn(1).width = Math.max(sheet.getColumn(1).width ?? 0, 11);
+    sheet.getColumn(2).width = Math.max(sheet.getColumn(2).width ?? 0, 8);
+    for (let column = 4; column <= 30; column++)
+      sheet.getColumn(column).width = Math.max(sheet.getColumn(column).width ?? 0, 12);
+    sheet.getColumn(31).width = Math.max(sheet.getColumn(31).width ?? 0, 48);
+    sheet.getRow(9).height = Math.max(sheet.getRow(9).height ?? 0, 150);
     for (let row = 4; row <= 42 + addedRows; row++)
       for (let column = 1; column <= 31; column++) {
         const cell = sheet.getCell(row, column);
         if (cell.isMerged && cell.master.address !== cell.address) continue;
-        if (cell.value !== null && cell.font?.size) {
+        if (cell.value !== null) {
           cell.style = structuredClone(cell.style);
-          cell.font = { ...cell.font, size: Math.min(cell.font.size + (row === 9 ? 2 : 4), 26) };
+          const size = row <= 6 ? 18 : row === 9 ? 14 : row <= 8 ? 14 : column === 2 ? 10 : 14;
+          cell.font = { ...cell.font, name: 'Arial', size };
+          cell.alignment = { ...cell.alignment, vertical: 'middle', shrinkToFit: true, wrapText: row === 9 };
         }
       }
-    sheet.getColumn(31).width = Math.max(sheet.getColumn(31).width ?? 0, 44);
     const [year, month, day] = date.split('-');
     sheet.getCell('F4').value = `DATE : ${day}/${month}/${year}`;
     let row = 13;
@@ -132,8 +139,8 @@ export async function writeBatch(orders: Order[], template: string, destination:
         cell.value = total;
         // Template cells can share style objects; each quantity needs its own markers.
         cell.style = structuredClone(cell.style);
-        cell.font = { ...cell.font, size: 22 };
-        cell.alignment = { ...cell.alignment, wrapText: true, shrinkToFit: false };
+        cell.font = { ...cell.font, name: 'Arial', size: 18 };
+        cell.alignment = { ...cell.alignment, horizontal: 'center', vertical: 'middle', wrapText: false, shrinkToFit: true };
         // A literal prefix in the number format keeps the underlying value numeric.
         if (!usesQtyRow(code)) {
           cell.numFmt = '0';
@@ -142,7 +149,8 @@ export async function writeBatch(orders: Order[], template: string, destination:
         } else {
           const lines = markers.filter(Boolean);
           cell.numFmt = `0"\n${lines.join('\n')}"`;
-          sheet.getRow(targetRow).height = Math.max(sheet.getRow(targetRow).height ?? 15, (lines.length + 1) * 24 + 6);
+          cell.alignment = { ...cell.alignment, wrapText: true };
+          sheet.getRow(targetRow).height = Math.max(sheet.getRow(targetRow).height ?? 15, (lines.length + 1) * 22 + 6);
         }
       }
 
@@ -154,13 +162,13 @@ export async function writeBatch(orders: Order[], template: string, destination:
         const cell = sheet.getCell(row + i, 31);
         cell.value = numbers[i] ?? null;
         if (numbers[i]) {
-          cell.font = { ...cell.font, size: 24, bold: true };
+          cell.font = { ...cell.font, name: 'Arial', size: 16, bold: true };
           cell.alignment = {
             ...cell.alignment,
             horizontal: 'left',
             vertical: 'middle',
-            wrapText: true,
-            shrinkToFit: false,
+            wrapText: false,
+            shrinkToFit: true,
           };
           sheet.getRow(row + i).height = Math.max(sheet.getRow(row + i).height ?? 15, 32);
         }

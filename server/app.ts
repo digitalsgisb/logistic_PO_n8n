@@ -278,11 +278,12 @@ export async function buildApp(options = config) {
     return { ok: true, ...(await engine.clearHistory()) };
   });
   app.get<{ Params: { date: string } }>('/api/dispatch-dates/:date/workbook', async (req, reply) => {
-    const output = engine.ledger.download(req.params.date);
+    const output = await engine.ledger.download(req.params.date);
     reply
       .type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-      .header('Content-Disposition', `attachment; filename="${output.filename}"`);
-    return reply.send(createReadStream(output.path));
+      .header('Content-Disposition', `attachment; filename="${output.filename}"`)
+      .header('Cache-Control', 'no-store');
+    return reply.send(output.buffer);
   });
   app.get<{ Params: { id: string } }>('/api/jobs/:id', (req) => publicJob(getJob(req.params.id)));
   app.post<{ Querystring: { job?: string } }>('/api/tagging/review', async (req, reply) => {

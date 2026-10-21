@@ -122,7 +122,7 @@ test('four sample orders produce one daily sheet with nine quantities and PO num
     assert.equal(s.getCell('H17').value, 30);
     assert.equal(s.getCell('H19').value, null);
     assert.equal(s.getCell('AE19').value, null);
-    assert.equal(s.getCell('AE17').font.size, 24);
+    assert.equal(s.getCell('AE17').font.size, 16);
     assert.equal(s.getCell('AE17').font.bold, true);
     assert.equal(s.getCell('AE15').value, null);
     assert.equal(s.pageSetup.printArea, 'A4:AE42');
@@ -133,9 +133,18 @@ test('four sample orders produce one daily sheet with nine quantities and PO num
     assert.equal(s.pageSetup.fitToHeight, 1);
     assert.equal(s.pageSetup.margins?.top, 0.1);
     assert.equal(s.getRow(42).height, 35.1);
-    assert.equal(s.getCell('A4').font.size, 22);
-    assert.equal(s.getCell('D8').font.size, 22);
-    assert.equal(s.getCell('V13').font.size, 22);
+    assert.equal(s.getCell('A4').font.size, 18);
+    assert.equal(s.getCell('D8').font.size, 14);
+    assert.equal(s.getCell('V13').font.size, 18);
+    assert.equal(s.getCell('V13').alignment.shrinkToFit, true);
+    assert.equal(!!s.getCell('V13').alignment.wrapText, false);
+    assert.equal(!!s.getCell('AE13').alignment.wrapText, false);
+    assert.equal(s.getCell('AE13').alignment.shrinkToFit, true);
+    assert.equal(!!s.getCell('A13').alignment.wrapText, false);
+    assert.ok(s.getColumn(1).width! >= 11);
+    assert.ok(s.getColumn(31).width! >= 48);
+    for (let column = 4; column <= 30; column++) assert.ok(s.getColumn(column).width! >= 12);
+    assert.ok(s.getRow(9).height! >= 150);
     assert.equal(s.getCell('V13').numFmt, '"*"0');
     assert.equal(s.getCell('W14').numFmt, '0');
     assert.equal(s.getCell('D17').numFmt, '0');
@@ -410,7 +419,7 @@ test('date ledger combines uploads by printed date and releases only after confi
     await engine.ledger.ingest(first);
     assert.equal(store.getDate('2026-09-03')!.status, 'open');
     assert.equal(store.getDate('2026-09-03')!.orders.length, 1);
-    assert.throws(() => engine.ledger.download('2026-09-03'));
+    await assert.rejects(engine.ledger.download('2026-09-03'));
     await engine.ledger.ingest(second);
     assert.equal(store.getDate('2026-09-03')!.orders.length, 2);
     const nextDatePage = pageFor({ ...structuredClone(orders[1]), delivery_date: '2026-09-04' }, 'next-date');
@@ -421,7 +430,7 @@ test('date ledger combines uploads by printed date and releases only after confi
     assert.equal(store.getDate('2026-09-03')!.orders.length, 2);
     assert.equal(store.getDate('2026-09-04')!.orders.length, 1);
     await engine.ledger.setComplete('2026-09-03', true);
-    const file = engine.ledger.download('2026-09-03').path;
+    const file = (await engine.ledger.download('2026-09-03')).path;
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(file);
     assert.equal(workbook.worksheets[0].getCell('V13').value, 1200);
@@ -434,7 +443,7 @@ test('date ledger combines uploads by printed date and releases only after confi
     await engine.ledger.ingest([changed]);
     assert.equal(store.getDate('2026-09-03')!.status, 'open');
     assert.equal(store.getDate('2026-09-03')!.reopened_reason, 'new_po');
-    assert.throws(() => engine.ledger.download('2026-09-03'));
+    await assert.rejects(engine.ledger.download('2026-09-03'));
     await engine.ledger.setComplete('2026-09-03', true);
     assert.equal(store.getDate('2026-09-03')!.orders.length, 2);
   } finally {
