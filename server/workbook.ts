@@ -39,17 +39,43 @@ export async function writeBatch(orders: Order[], template: string, destination:
   const dates = workbookDate ? [workbookDate] : [...new Set(orders.map((order) => order.delivery_date))].sort();
   for (const date of dates) {
     const sheet = original;
+    const tripOrdersByTrip = Array.from({ length: 10 }, (_, index) =>
+      orders.filter((order) => (workbookDate || order.delivery_date === date) && order.trip === index + 1),
+    );
+    const extraRows = tripOrdersByTrip.map((group) => Math.max(0, group.length - 3));
+    const addedRows = extraRows.reduce((sum, count) => sum + count, 0);
+    if (addedRows) {
+      // ExcelJS does not relocate merged ranges reliably during row insertion.
+      // Unmerge first, then rebuild the ranges around the expanded trip blocks.
+      const merges = [...sheet.model.merges];
+      for (const range of merges) sheet.unMergeCells(range);
+      for (let index = 9; index >= 0; index--) {
+        if (!extraRows[index]) continue;
+        const insertAt = 16 + index * 3;
+        sheet.insertRows(insertAt, Array.from({ length: extraRows[index] }, () => []), 'i+');
+        for (let offset = 0; offset < extraRows[index]; offset++)
+          sheet.getRow(insertAt + offset).height = sheet.getRow(insertAt - 1).height;
+      }
+      const shiftedRow = (row: number, end: boolean) => row + extraRows.reduce(
+        (sum, count, index) => sum + (15 + index * 3 < row || (end && 15 + index * 3 === row) ? count : 0),
+        0,
+      );
+      for (const range of merges) {
+        const match = range.match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/)!;
+        sheet.mergeCells(`${match[1]}${shiftedRow(+match[2], false)}:${match[3]}${shiftedRow(+match[4], true)}`);
+      }
+    }
     // Force every generated daily sheet to one A4 landscape page.
     sheet.pageSetup.paperSize = 9;
     sheet.pageSetup.orientation = 'landscape';
     sheet.pageSetup.fitToPage = true;
     sheet.pageSetup.fitToWidth = 1;
     sheet.pageSetup.fitToHeight = 1;
-    sheet.pageSetup.printArea = 'A4:AE42';
+    sheet.pageSetup.printArea = `A4:AE${42 + addedRows}`;
     sheet.pageSetup.margins = { left: 0.1, right: 0.1, top: 0.1, bottom: 0.1, header: 0, footer: 0 };
     // The template was designed for a much larger print sheet. Increase its text
     // slightly so labels remain readable after Excel scales the grid onto A4.
-    for (let row = 4; row <= 42; row++)
+    for (let row = 4; row <= 42 + addedRows; row++)
       for (let column = 1; column <= 31; column++) {
         const cell = sheet.getCell(row, column);
         if (cell.isMerged && cell.master.address !== cell.address) continue;
@@ -61,9 +87,10 @@ export async function writeBatch(orders: Order[], template: string, destination:
     sheet.getColumn(31).width = Math.max(sheet.getColumn(31).width ?? 0, 44);
     const [year, month, day] = date.split('-');
     sheet.getCell('F4').value = `DATE : ${day}/${month}/${year}`;
+    let row = 13;
     for (let trip = 1; trip <= 10; trip++) {
-      const row = 13 + (trip - 1) * 3;
-      const tripOrders = orders.filter((order) => (workbookDate || order.delivery_date === date) && order.trip === trip);
+      const tripOrders = tripOrdersByTrip[trip - 1];
+      const rowCount = 3 + extraRows[trip - 1];
       const markersByOrder = new Map<Order, string>();
       for (const destination of ['BUKIT RAJA', 'SHAH ALAM'] as const) {
         const group = tripOrders
@@ -119,16 +146,14 @@ export async function writeBatch(orders: Order[], template: string, destination:
         }
       }
 
-      // Use the three existing Remarks cells next to each trip.
+      // Each PO gets its own cell; expanded trip blocks keep overflow in the same trip.
       const numbers = markedOrders.map(({ order, marker }) =>
         marker ? `${marker} ${order.kb_number}` : order.kb_number,
       );
-      let offset = 0;
-      for (let i = 0; i < 3; i++) {
-        const count = Math.ceil((numbers.length - offset) / (3 - i));
+      for (let i = 0; i < rowCount; i++) {
         const cell = sheet.getCell(row + i, 31);
-        cell.value = count ? numbers.slice(offset, offset + count).join('\n') : null;
-        if (count) {
+        cell.value = numbers[i] ?? null;
+        if (numbers[i]) {
           cell.font = { ...cell.font, size: 24, bold: true };
           cell.alignment = {
             ...cell.alignment,
@@ -137,10 +162,10 @@ export async function writeBatch(orders: Order[], template: string, destination:
             wrapText: true,
             shrinkToFit: false,
           };
-          sheet.getRow(row + i).height = Math.max(sheet.getRow(row + i).height ?? 15, count * 26 + 6);
+          sheet.getRow(row + i).height = Math.max(sheet.getRow(row + i).height ?? 15, 32);
         }
-        offset += count;
       }
+      row += rowCount;
     }
   }
   wb.creator = 'Logistic Digital';

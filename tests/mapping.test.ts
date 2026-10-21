@@ -63,7 +63,7 @@ test('only CBOX and HOOK use QTY and stars; all other parts use plain KB NO quan
     await wb.xlsx.readFile(file);
     const sheet = wb.worksheets[0];
     for (let trip = 1; trip <= 10; trip++) {
-      const row = 13 + (trip - 1) * 3;
+      const row = 13 + (trip - 1) * 4;
       for (const [code, { column }] of Object.entries(headers)) {
         const qty = ['614', 'HU83'].includes(code);
         const cell = sheet.getCell(row + (qty ? 0 : 1), column);
@@ -72,7 +72,7 @@ test('only CBOX and HOOK use QTY and stars; all other parts use plain KB NO quan
         assert.equal(sheet.getCell(row + (qty ? 1 : 0), column).value, null);
         assert.equal(sheet.getCell(row + 2, column).value, null);
       }
-      const remarks = [row, row + 1, row + 2].flatMap((r) => String(sheet.getCell(r, 31).value ?? '').split('\n'));
+      const remarks = [row, row + 1, row + 2, row + 3].map((r) => sheet.getCell(r, 31).value);
       for (const destination of ['BUKIT RAJA', 'SHAH ALAM']) {
         assert.ok(remarks.includes(`BASE-${destination}-${trip}`));
         assert.ok(remarks.includes(`* SPECIAL-${destination}-${trip}`));
@@ -202,7 +202,7 @@ test('shared quantities add within a date; different dates produce separate work
     assert.equal(sheet.getCell('V13').value, 8400);
     assert.equal(sheet.getCell('V13').numFmt, '0"\n*\n**\n***\n****\n*****\n******"');
     assert.deepEqual(
-      [13, 14, 15].flatMap((r) => String(sheet.getCell(r, 31).value).split('\n')),
+      Array.from({ length: 7 }, (_, i) => sheet.getCell(13 + i, 31).value),
       crowded.map((o, i) => (i ? `${'*'.repeat(i)} ${o.kb_number}` : o.kb_number)),
     );
     assert.ok(sheet.getRow(13).height! >= 84);
@@ -215,6 +215,45 @@ test('shared quantities add within a date; different dates produce separate work
     await fs.rm(dir, { recursive: true, force: true });
   }
 });
+test('five POs occupy separate remarks cells without overwriting the following trip', async () => {
+  const base = validatePage(pageFor(orders[1]).extraction, pageFor(orders[1]));
+  const tripOne = Array.from({ length: 5 }, (_, i) => ({
+    ...structuredClone(base),
+    source_order_id: `SGIS12DA${8000 + i}`,
+    kb_number: `SGIS12DA${8000 + i}-SA`,
+  }));
+  const tripTwo = validatePage(pageFor(orders[2]).extraction, pageFor(orders[2]));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'toyota-single-po-cell-'));
+  try {
+    const file = path.join(dir, 'five-orders.xlsx');
+    await writeBatch([...tripOne, tripTwo], 'templates/toyota.xlsx', file);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(file);
+    const sheet = workbook.worksheets[0];
+    assert.deepEqual(
+      Array.from({ length: 5 }, (_, i) => sheet.getCell(13 + i, 31).value),
+      tripOne.map((order) => order.kb_number),
+    );
+    assert.equal(sheet.getCell('AE18').value, tripTwo.kb_number);
+    assert.equal(sheet.getCell(14, headers[base.items[0].item_code].column).value,
+      base.items[0].total_quantity * 5);
+    assert.equal(sheet.getCell(19, headers[tripTwo.items[0].item_code].column).value,
+      tripTwo.items[0].total_quantity);
+    assert.equal(sheet.getCell('A18').value, 'TRIP 2');
+    assert.equal(sheet.getCell('B16').value, null);
+    assert.equal(sheet.getCell('B17').value, null);
+    assert.ok(sheet.model.merges.includes('A13:A17'));
+    assert.ok(sheet.model.merges.includes('C13:C17'));
+    assert.ok(sheet.model.merges.includes('A18:A20'));
+    assert.equal(sheet.pageSetup.printArea, 'A4:AE44');
+    assert.equal(sheet.pageSetup.fitToHeight, 1);
+    assert.equal(sheet.getCell('AE17').font.bold, true);
+    assert.deepEqual(sheet.getCell('AE16').border, sheet.getCell('AE15').border);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('markers are destination-local and prioritize HOOK independently of upload order or quantity', async () => {
   const sample = orders.map((o, i) => validatePage(pageFor(o, String(i)).extraction, pageFor(o, String(i))));
   const hook = structuredClone(sample[0]);
@@ -230,7 +269,7 @@ test('markers are destination-local and prioritize HOOK independently of upload 
       const wb = new ExcelJS.Workbook();
       await wb.xlsx.readFile(file);
       const sheet = wb.worksheets[0];
-      const remarks = [13, 14, 15].flatMap((r) => String(sheet.getCell(r, 31).value ?? '').split('\n'));
+      const remarks = [13, 14, 15, 16].map((r) => sheet.getCell(r, 31).value);
       assert.ok(remarks.includes('SGIS13FA5002-BR'));
       assert.equal(sheet.getCell('D13').numFmt, '0');
       assert.equal(sheet.getCell('V13').value, 600);
