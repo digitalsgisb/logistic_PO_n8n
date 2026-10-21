@@ -169,8 +169,8 @@ test('upload needs no shift; dates remain hidden until completion and survive jo
     await refreshed.xlsx.readFile(workbookPath);
     const sheet = refreshed.getWorksheet('ASSB2016')!;
     assert.equal(sheet.getCell('V13').value, 1200);
-    assert.equal(sheet.getCell('V13').font.size, 18);
-    assert.equal(sheet.getCell('AE13').font.size, 16);
+    assert.equal(sheet.getCell('V13').font.size, 24);
+    assert.equal(sheet.getCell('AE13').font.size, 20);
     assert.equal(sheet.getCell('AE13').value, 'SGIS12AA0747-SA');
     assert.deepEqual(store.getDate('2026-09-03'), completedEntry);
     const old = store.get(id)!;

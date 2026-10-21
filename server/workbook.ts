@@ -5,6 +5,37 @@ import type { Order } from './types.ts';
 import { headers } from './mapping.ts';
 
 const usesQtyRow = (code: string) => code === '614' || code === 'HU83';
+// Explicit line breaks reproduce the supplied reference instead of leaving Excel
+// to split part descriptions in the middle of identifiers such as KB61-CA.
+const partDescriptions: Record<string, string> = {
+  '9V82': 'Cpt\nassy flr',
+  D847: 'Cpt\nassy flr',
+  G360: 'Cpt\nassy flr\n( PET )',
+  G361: 'Cpt\nassy flr\n( HEV )',
+  '56C2': 'Cpt\nassy flr-\n290',
+  '56C3': 'Cpt\nassy\nflr-\n300',
+  '590V': 'Cpt\nassy\nflr',
+  '614': 'C.BOX',
+  '812': 'Mat\nlug\ncomp\nflr\n380',
+  '815V': 'Cov\nlug\ncomp\ndoor',
+  '818V': 'Cov\nlug\nc.t\nin\nLH\n200',
+  '816V': 'Cov\nlug\nc.t\nin\nRH\n290',
+  '817V': 'Cov\nlug\nRH\n300',
+  '819V': 'Cov\nlug\nLH\n300',
+  '824V': 'Cov\nAssy\nspare\nwheel\n320',
+  '823V': 'Cov\nAssy\nspare\nwheel\n310',
+  '822V': 'Pan.as\nsy LH\n540',
+  '821V': 'Pan.as\nsy RH\n550',
+  HU83: 'HOOK',
+  '239X': 'FC\n(AT)',
+  '240X': 'FC\n(MT)',
+  '238X': 'FC\n(FR)',
+  HU82: 'FC\n(RR)',
+  KH97: 'FC\nKL41-\nC0',
+  ZP47: 'RR\nKB61-\nCC',
+  KH98: 'FC\nKL61\nC0',
+  JP01: 'RR\nKB61-\nCA',
+};
 
 export function batchFilename(orders: Order[], workbookDate?: string) {
   if (workbookDate) return `Toyota_${workbookDate}_Combined.xlsx`;
@@ -73,31 +104,25 @@ export async function writeBatch(orders: Order[], template: string, destination:
     sheet.pageSetup.fitToHeight = 1;
     sheet.pageSetup.printArea = `A4:AE${42 + addedRows}`;
     sheet.pageSetup.margins = { left: 0.1, right: 0.1, top: 0.1, bottom: 0.1, header: 0, footer: 0 };
-    // Balance the template's narrow columns against the text size. Enlarging all
-    // fonts caused clipped part descriptions, wrapped trip labels and ### quantities.
-    sheet.getColumn(1).width = Math.max(sheet.getColumn(1).width ?? 0, 11);
-    sheet.getColumn(2).width = Math.max(sheet.getColumn(2).width ?? 0, 8);
-    for (let column = 4; column <= 30; column++)
-      sheet.getColumn(column).width = Math.max(sheet.getColumn(column).width ?? 0, 12);
-    sheet.getColumn(31).width = Math.max(sheet.getColumn(31).width ?? 0, 48);
-    sheet.getRow(9).height = Math.max(sheet.getRow(9).height ?? 0, 150);
-    for (let row = 4; row <= 42 + addedRows; row++)
-      for (let column = 1; column <= 31; column++) {
-        const cell = sheet.getCell(row, column);
-        if (cell.isMerged && cell.master.address !== cell.address) continue;
-        if (cell.value !== null) {
-          cell.style = structuredClone(cell.style);
-          const size = row <= 6 ? 18 : row === 9 ? 14 : row <= 8 ? 14 : column === 2 ? 10 : 14;
-          cell.font = { ...cell.font, name: 'Arial', size };
-          cell.alignment = { ...cell.alignment, vertical: 'middle', shrinkToFit: true, wrapText: row === 9 };
-        }
-      }
+    // Keep the reference template's column proportions, header heights and Tahoma
+    // typography. Only generated values need separate fitting rules below.
+    for (const [code, description] of Object.entries(partDescriptions)) {
+      const cell = sheet.getCell(9, headers[code].column);
+      cell.style = structuredClone(cell.style);
+      cell.value = description;
+      cell.font = { ...cell.font, size: description.split('\n').length >= 6 ? 16 : 18 };
+      cell.alignment = { ...cell.alignment, wrapText: true, shrinkToFit: false };
+    }
     const [year, month, day] = date.split('-');
     sheet.getCell('F4').value = `DATE : ${day}/${month}/${year}`;
     let row = 13;
     for (let trip = 1; trip <= 10; trip++) {
       const tripOrders = tripOrdersByTrip[trip - 1];
       const rowCount = 3 + extraRows[trip - 1];
+      const tripLabel = sheet.getCell(row, 1);
+      tripLabel.style = structuredClone(tripLabel.style);
+      tripLabel.value = `TRIP\n${trip}`;
+      tripLabel.alignment = { ...tripLabel.alignment, wrapText: true, shrinkToFit: false };
       const markersByOrder = new Map<Order, string>();
       for (const destination of ['BUKIT RAJA', 'SHAH ALAM'] as const) {
         const group = tripOrders
@@ -139,7 +164,7 @@ export async function writeBatch(orders: Order[], template: string, destination:
         cell.value = total;
         // Template cells can share style objects; each quantity needs its own markers.
         cell.style = structuredClone(cell.style);
-        cell.font = { ...cell.font, name: 'Arial', size: 18 };
+        cell.font = { ...cell.font, name: 'Tahoma', size: 24, bold: true };
         cell.alignment = { ...cell.alignment, horizontal: 'center', vertical: 'middle', wrapText: false, shrinkToFit: true };
         // A literal prefix in the number format keeps the underlying value numeric.
         if (!usesQtyRow(code)) {
@@ -150,7 +175,7 @@ export async function writeBatch(orders: Order[], template: string, destination:
           const lines = markers.filter(Boolean);
           cell.numFmt = `0"\n${lines.join('\n')}"`;
           cell.alignment = { ...cell.alignment, wrapText: true };
-          sheet.getRow(targetRow).height = Math.max(sheet.getRow(targetRow).height ?? 15, (lines.length + 1) * 22 + 6);
+          sheet.getRow(targetRow).height = Math.max(sheet.getRow(targetRow).height ?? 15, (lines.length + 1) * 28 + 6);
         }
       }
 
@@ -162,7 +187,7 @@ export async function writeBatch(orders: Order[], template: string, destination:
         const cell = sheet.getCell(row + i, 31);
         cell.value = numbers[i] ?? null;
         if (numbers[i]) {
-          cell.font = { ...cell.font, name: 'Arial', size: 16, bold: true };
+          cell.font = { ...cell.font, name: 'Tahoma', size: 20, bold: true };
           cell.alignment = {
             ...cell.alignment,
             horizontal: 'left',

@@ -110,7 +110,7 @@ test('four sample orders produce one daily sheet with nine quantities and PO num
         assert.equal(s.getCell(row + (qty ? 1 : 0), col).value, null);
         assert.equal(s.getCell(row + 2, col).value, null);
       }
-    assert.equal(s.getCell('A25').value, 'TRIP 5');
+    assert.equal(s.getCell('A25').value, 'TRIP\n5');
     assert.equal(s.getCell('H10').value, null);
     assert.equal(s.getCell('C13').value, null);
     assert.equal(s.getCell('V13').value, 1200);
@@ -122,7 +122,7 @@ test('four sample orders produce one daily sheet with nine quantities and PO num
     assert.equal(s.getCell('H17').value, 30);
     assert.equal(s.getCell('H19').value, null);
     assert.equal(s.getCell('AE19').value, null);
-    assert.equal(s.getCell('AE17').font.size, 16);
+    assert.equal(s.getCell('AE17').font.size, 20);
     assert.equal(s.getCell('AE17').font.bold, true);
     assert.equal(s.getCell('AE15').value, null);
     assert.equal(s.pageSetup.printArea, 'A4:AE42');
@@ -134,17 +134,28 @@ test('four sample orders produce one daily sheet with nine quantities and PO num
     assert.equal(s.pageSetup.margins?.top, 0.1);
     assert.equal(s.getRow(42).height, 35.1);
     assert.equal(s.getCell('A4').font.size, 18);
-    assert.equal(s.getCell('D8').font.size, 14);
-    assert.equal(s.getCell('V13').font.size, 18);
+    assert.equal(s.getCell('D8').font.size, 18);
+    assert.equal(s.getCell('V13').font.size, 24);
+    assert.equal(s.getCell('V13').font.name, 'Tahoma');
+    assert.equal(s.getCell('V13').font.bold, true);
     assert.equal(s.getCell('V13').alignment.shrinkToFit, true);
     assert.equal(!!s.getCell('V13').alignment.wrapText, false);
     assert.equal(!!s.getCell('AE13').alignment.wrapText, false);
     assert.equal(s.getCell('AE13').alignment.shrinkToFit, true);
-    assert.equal(!!s.getCell('A13').alignment.wrapText, false);
-    assert.ok(s.getColumn(1).width! >= 11);
-    assert.ok(s.getColumn(31).width! >= 48);
-    for (let column = 4; column <= 30; column++) assert.ok(s.getColumn(column).width! >= 12);
-    assert.ok(s.getRow(9).height! >= 150);
+    assert.equal(s.getCell('A13').value, 'TRIP\n1');
+    assert.equal(s.getCell('A13').alignment.wrapText, true);
+    const reference = new ExcelJS.Workbook();
+    await reference.xlsx.readFile('templates/toyota.xlsx');
+    const referenceSheet = reference.getWorksheet('ASSB2016')!;
+    for (let column = 1; column <= 31; column++)
+      assert.equal(s.getColumn(column).width, referenceSheet.getColumn(column).width);
+    for (const address of ['A4', 'D6', 'A7', 'D8', 'D9', 'M9', 'AE7', 'B13'])
+      assert.deepEqual(s.getCell(address).font, referenceSheet.getCell(address).font, address);
+    assert.equal(s.getRow(9).height, referenceSheet.getRow(9).height);
+    assert.equal(s.getCell('N9').value, 'Cov\nlug\nc.t\nin\nLH\n200');
+    assert.equal(s.getCell('N9').font.size, 16);
+    assert.equal(s.getCell('AD9').value, 'RR\nKB61-\nCA');
+    assert.equal(s.getCell('T9').value, 'Pan.as\nsy LH\n540');
     assert.equal(s.getCell('V13').numFmt, '"*"0');
     assert.equal(s.getCell('W14').numFmt, '0');
     assert.equal(s.getCell('D17').numFmt, '0');
@@ -248,7 +259,7 @@ test('five POs occupy separate remarks cells without overwriting the following t
       base.items[0].total_quantity * 5);
     assert.equal(sheet.getCell(19, headers[tripTwo.items[0].item_code].column).value,
       tripTwo.items[0].total_quantity);
-    assert.equal(sheet.getCell('A18').value, 'TRIP 2');
+    assert.equal(sheet.getCell('A18').value, 'TRIP\n2');
     assert.equal(sheet.getCell('B16').value, null);
     assert.equal(sheet.getCell('B17').value, null);
     assert.ok(sheet.model.merges.includes('A13:A17'));
