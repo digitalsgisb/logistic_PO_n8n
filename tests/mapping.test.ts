@@ -372,6 +372,51 @@ test('callback uses the unique printed PO ID and still rejects ambiguous or miss
   }
 });
 
+test('callback takes destination from the printed plant and blocks missing or conflicting plants', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'toyota-printed-plant-'));
+  const store = new Store(dir);
+  try {
+    const engine = new Engine(store, { ...config, dataDir: dir });
+    let index = 0;
+    for (const expected of [orders[1], orders[3]]) {
+      for (const modelDestination of ['', 'UNKNOWN', 'SHAH ALAM BUKIT RAJA',
+        expected.destination === 'SHAH ALAM' ? 'BUKIT RAJA' : 'SHAH ALAM']) {
+        const page = { ...pageFor(expected), state: 'extracting' as const, extraction: undefined };
+        if (expected.destination === 'BUKIT RAJA')
+          page.text = page.text.replace('BUKIT RAJA', 'BKT RAJA');
+        const job = { id: `printed-plant-${index++}`, state: 'processing' as const, stage: 'test',
+          attempt: 'first', created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+          files: [], pages: [page], results: [] };
+        store.save(job);
+        engine.result(job.id, job.attempt, page.id, { ...expected, destination: modelDestination });
+        const saved = store.get(job.id)!;
+        assert.equal(saved.pages[0].extraction!.destination, expected.destination);
+        await engine.finish(saved);
+        assert.equal(store.get(job.id)!.state, 'completed');
+        const order = store.getDate(expected.delivery_date)!.orders.find(o => o.source_order_id === expected.source_order_id)!;
+        assert.equal(order.destination, expected.destination);
+        assert.equal(order.kb_number, `${expected.source_order_id}-${expected.destination === 'SHAH ALAM' ? 'SA' : 'BR'}`);
+      }
+    }
+    for (const plant of ['UNKNOWN', 'SHAH ALAM BUKIT RAJA']) {
+      const page = { ...pageFor(orders[1]), state: 'extracting' as const, extraction: undefined };
+      page.text = page.text.replace('SHAH ALAM', plant);
+      const job = { id: `invalid-plant-${index++}`, state: 'processing' as const, stage: 'test',
+        attempt: 'first', created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        files: [], pages: [page], results: [] };
+      store.save(job);
+      engine.result(job.id, job.attempt, page.id, orders[1]);
+      const saved = store.get(job.id)!;
+      assert.equal(saved.pages[0].state, 'error');
+      assert.match(saved.pages[0].error!, /Destination is missing or conflicting/);
+      assert.equal(assemble(saved.pages).orders.length, 0);
+    }
+  } finally {
+    store.db.close();
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('trip comes from the printed delivery sequence independently of the route suffix', () => {
   for (const trip of [1, 2, 10]) {
     const p = pageFor(orders[3]);
