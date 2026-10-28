@@ -189,6 +189,7 @@ The initial bundled template was prepared from the source BIFF cells, styles, di
 - “Unable to start processing”: verify the workflow is published, network/service names resolve, and the service secret matches.
 - “No response from processing”: inspect n8n execution logs; fix the model/connection issue, then retry. The timeout defaults to 15 minutes without page progress.
 - A review error caused by incorrect source data requires a corrected upload; the pilot does not include an in-browser editor.
+- For PO-number extraction, the API uses the unique printed `SGIS` order ID rather than the model's version (which can include a barcode prefix or destination suffix). Missing or conflicting printed IDs still require review. After updating, rebuild the API with `docker compose up -d --build api`, then use **Retry unsuccessful POs** on the affected batch. Late PDS uploads are supported and merge into the printed delivery date; upload timing does not cause an invalid-identifier error.
 - This pilot does not update monitoring workbooks, Microsoft 365, or other customers' records.
 
 See `docs/verification.md` for the implementation's recorded checks and deployment limitations.

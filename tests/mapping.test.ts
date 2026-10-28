@@ -329,6 +329,49 @@ test('reprint system codes are not mistaken for additional order identifiers', (
   assert.equal(assemble([p]).orders.length, 1);
 });
 
+test('callback uses the unique printed PO ID and still rejects ambiguous or missing source IDs', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'toyota-printed-id-'));
+  const store = new Store(dir);
+  try {
+    const engine = new Engine(store, { ...config, dataDir: dir });
+    const expected = { ...structuredClone(orders[1]), source_order_id: 'SGIS12DA3325',
+      delivery_date: '2026-10-28' };
+    const text = textFor(expected).replace('03/09/2026', '28/10/2026');
+    // Barcode and readable representations repeat the same ID on the real PDS.
+    const printed = `${text}\n*11 SGIS12DA3325*\nREPRINT # 1 (SGIS1P02)`;
+    for (const [index, modelId] of ['11 SGIS12DA3325', 'SGIS12DA3325-SA', '', 'SGIS12DA3326'].entries()) {
+      const page = { ...pageFor(expected), text: printed, state: 'extracting' as const,
+        extraction: undefined };
+      const job = { id: `printed-id-${index}`, state: 'processing' as const, stage: 'test',
+        attempt: 'first', created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        files: [], pages: [page], results: [] };
+      store.save(job);
+      engine.result(job.id, job.attempt, page.id, { ...expected, source_order_id: modelId });
+      const saved = store.get(job.id)!;
+      assert.equal(saved.pages[0].extraction!.source_order_id, expected.source_order_id);
+      await engine.finish(saved);
+      assert.equal(store.get(job.id)!.state, 'completed');
+      assert.equal(store.getDate('2026-10-28')!.orders.length, 1);
+      assert.equal(store.getDate('2026-10-28')!.orders[0].kb_number, 'SGIS12DA3325-SA');
+    }
+    for (const [index, source] of [printed + '\nSGIS12DA3326', printed.replaceAll('SGIS12DA3325', '')].entries()) {
+      const page = { ...pageFor(expected), text: source, state: 'extracting' as const,
+        extraction: undefined };
+      const job = { id: `ambiguous-id-${index}`, state: 'processing' as const, stage: 'test',
+        attempt: 'first', created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        files: [], pages: [page], results: [] };
+      store.save(job);
+      engine.result(job.id, job.attempt, page.id, expected);
+      const result = assemble(store.get(job.id)!.pages);
+      assert.equal(result.orders.length, 0);
+      assert.match(result.errors[0].error!, /identifier does not match/);
+    }
+  } finally {
+    store.db.close();
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('trip comes from the printed delivery sequence independently of the route suffix', () => {
   for (const trip of [1, 2, 10]) {
     const p = pageFor(orders[3]);

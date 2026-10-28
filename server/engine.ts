@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { Store } from './store.ts';
 import { config } from './config.ts';
 import { readPdf } from './pdf.ts';
-import { assemble, hash, sourceDeliveryDate, sourceItems } from './mapping.ts';
+import { assemble, hash, sourceDeliveryDate, sourceItems, sourceOrderId } from './mapping.ts';
 import { DateLedger } from './dateLedger.ts';
 import type { Job, Extraction } from './types.ts';
 const running = new Set(['reading', 'processing', 'generating']);
@@ -149,8 +149,10 @@ export class Engine {
       // row and the printed TOTAL reconcile, instead of a model's misread digits.
       const printedItems = sourceItems(page.text);
       const printedDate = sourceDeliveryDate(page.text);
+      const printedId = sourceOrderId(page.text);
       page.extraction = {
         ...extraction,
+        source_order_id: printedId ?? extraction.source_order_id,
         items: printedItems ?? extraction.items,
         delivery_date: printedDate ?? extraction.delivery_date,
       };

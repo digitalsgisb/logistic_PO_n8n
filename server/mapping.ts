@@ -7,6 +7,12 @@ const sourceOrderIds = (text: string) => [
   ...new Set(text.toUpperCase().match(/\bSGIS\d{2}[A-Z]{2}\d{4}\b/g) ?? []),
 ];
 
+/** Use the printed PO identifier only when the source is unambiguous. */
+export function sourceOrderId(text: string) {
+  const ids = sourceOrderIds(text);
+  return ids.length === 1 ? ids[0] : undefined;
+}
+
 export const headers: Record<string, { column: number; destination: Destination }> = Object.fromEntries(
   [
     '9V82',
