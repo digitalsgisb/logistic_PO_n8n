@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { Store } from './store.ts';
 import { config } from './config.ts';
 import { readPdf } from './pdf.ts';
-import { assemble, destination, hash, sourceDeliveryDate, sourceItems, sourceOrderId } from './mapping.ts';
+import { assemble, destination, hash, sourceDeliveryDate, sourceItems, sourceOrderId, sourceRoute, sourcePagination } from './mapping.ts';
 import { DateLedger } from './dateLedger.ts';
 import type { Job, Extraction } from './types.ts';
 const running = new Set(['reading', 'processing', 'generating']);
@@ -145,17 +145,21 @@ export class Engine {
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
         throw new Error('AI returned invalid structured output.');
       const extraction = parsed as Extraction;
-      // These rows have a fixed, printed layout. Use the source text when every
-      // row and the printed TOTAL reconcile, instead of a model's misread digits.
+      // Prefer unambiguous printed fields. Items must reconcile with the printed
+      // TOTAL; full source validation still runs before any order is saved.
       const printedItems = sourceItems(page.text);
       const printedDate = sourceDeliveryDate(page.text);
       const printedId = sourceOrderId(page.text);
+      const printedRoute = sourceRoute(page.text);
+      const printedPagination = sourcePagination(page.text);
       // A missing or conflicting printed destination must fail even if AI guesses one.
       const printedDestination = destination(page.text);
       page.extraction = {
         ...extraction,
         source_order_id: printedId ?? extraction.source_order_id,
         destination: printedDestination,
+        route: printedRoute ?? extraction.route,
+        ...(printedPagination ?? {}),
         items: printedItems ?? extraction.items,
         delivery_date: printedDate ?? extraction.delivery_date,
       };

@@ -417,6 +417,53 @@ test('callback takes destination from the printed plant and blocks missing or co
   }
 });
 
+test('callback recovers every field from readable PDFs even when all model fields are wrong', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'toyota-source-fields-'));
+  const store = new Store(dir);
+  try {
+    const engine = new Engine(store, { ...config, dataDir: dir });
+    const texts = await readPdf(pdfFor(orders.map(order => `${textFor(order)}\n${order.page_number}/${order.page_count}\n${order.route}`)));
+    const pages = orders.map((order, index) => ({ ...pageFor(order, `p${index}`),
+      text: texts[index], number: index + 1, state: 'extracting' as const, extraction: undefined }));
+    const job = { id: 'source-fields', state: 'processing' as const, stage: 'test', attempt: 'first',
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+      files: [], pages, results: [] };
+    store.save(job);
+    for (const page of pages) engine.result(job.id, job.attempt, page.id, {
+      source_order_id: '', destination: '', delivery_date: '', route: 'PA1-10',
+      page_number: 99, page_count: 99, items: [],
+    });
+    const saved = store.get(job.id)!;
+    const result = assemble(saved.pages);
+    assert.deepEqual(result.errors, []);
+    assert.equal(result.orders.length, 4);
+    assert.deepEqual(result.orders.map(order => order.route), orders.map(order => order.route));
+    assert.deepEqual(result.orders.map(order => order.trip), [1, 1, 2, 2]);
+    await engine.finish(saved);
+    assert.equal(store.get(job.id)!.state, 'completed');
+    assert.equal(store.getDate('2026-09-03')!.orders.length, 4);
+
+    for (const [index, text] of [
+      textFor(orders[0]).replace('WS02-01', ''),
+      textFor(orders[0]) + '\nWS02-02',
+      textFor(orders[0]).replace('1/1', ''),
+      textFor(orders[0]) + '\n1/2',
+      textFor(orders[0]).replace('1/1', '0/1'),
+    ].entries()) {
+      const page = { ...pageFor(), text, state: 'extracting' as const, extraction: undefined };
+      const invalid = { ...job, id: `invalid-source-${index}`, pages: [page] };
+      store.save(invalid);
+      engine.result(invalid.id, invalid.attempt, page.id, orders[0]);
+      const rejected = assemble(store.get(invalid.id)!.pages);
+      assert.equal(rejected.orders.length, 0);
+      assert.match(rejected.errors[0].error!, /route|page numbering/);
+    }
+  } finally {
+    store.db.close();
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('trip comes from the printed delivery sequence independently of the route suffix', () => {
   for (const trip of [1, 2, 10]) {
     const p = pageFor(orders[3]);

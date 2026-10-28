@@ -13,6 +13,23 @@ export function sourceOrderId(text: string) {
   return ids.length === 1 ? ids[0] : undefined;
 }
 
+export function sourceRoute(text: string) {
+  const routes = [...new Set(text.match(/\b(?:WS02|WM02)-\d{2}\b/g) ?? [])];
+  return routes.length === 1 ? routes[0] : undefined;
+}
+
+export function sourcePagination(text: string) {
+  // Isolated markers exclude dates; duplicate printed headers are harmless.
+  const markers = text.split('\n').flatMap(line =>
+    [...line.matchAll(/(?:^|\s)(\d{1,3})\/(\d{1,3})(?=\s|$)/g)]
+      .map(match => `${Number(match[1])}/${Number(match[2])}`));
+  const unique = [...new Set(markers)];
+  if (unique.length !== 1) return undefined;
+  const [page_number, page_count] = unique[0].split('/').map(Number);
+  if (page_number < 1 || page_count < page_number || page_count > 100) return undefined;
+  return { page_number, page_count };
+}
+
 export const headers: Record<string, { column: number; destination: Destination }> = Object.fromEntries(
   [
     '9V82',
@@ -139,10 +156,7 @@ export function validatePage(raw: unknown, page: Page): Order {
   if (!sourceDates.includes(`${y}-${m}-${d}`))
     throw new Error('Delivery date is missing in the source.');
   const { sequence, trip } = deliverySequence(page.text, date);
-  // Page markers must be isolated (dates are excluded).
-  const marker = page.text
-    .split('\n')
-    .flatMap((l) => [...l.matchAll(/(?:^|\s)(\d{1,3})\/(\d{1,3})(?=\s|$)/g)])[0];
+  const marker = sourcePagination(page.text);
   if (
     !Number.isInteger(x.page_number) ||
     !Number.isInteger(x.page_count) ||
@@ -150,8 +164,8 @@ export function validatePage(raw: unknown, page: Page): Order {
     x.page_count < x.page_number ||
     x.page_count > 100 ||
     !marker ||
-    +marker[1] !== x.page_number ||
-    +marker[2] !== x.page_count
+    marker.page_number !== x.page_number ||
+    marker.page_count !== x.page_count
   )
     throw new Error('Invalid or ungrounded order page numbering.');
   if (!Array.isArray(x.items) || !x.items.length) throw new Error('No line items extracted.');
