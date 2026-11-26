@@ -1,12 +1,17 @@
 FROM node:24.12.0-bookworm-slim
 WORKDIR /app
+COPY server/requirements-perodua.txt /tmp/requirements-perodua.txt
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-venv \
+    && python3 -m venv /opt/perodua-python \
+    && /opt/perodua-python/bin/pip install --no-cache-dir -r /tmp/requirements-perodua.txt \
+    && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 COPY server ./server
 COPY templates/toyota.xlsx ./templates/toyota.xlsx
 RUN mkdir /data && chown node:node /data
 USER node
-ENV NODE_ENV=production DATA_DIR=/data HOST=0.0.0.0 PORT=3000 TZ=Asia/Kuala_Lumpur
+ENV NODE_ENV=production DATA_DIR=/data HOST=0.0.0.0 PORT=3000 TZ=Asia/Kuala_Lumpur PYTHON_BIN=/opt/perodua-python/bin/python
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s CMD node -e "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 CMD ["node", "--import", "tsx", "server/index.ts"]

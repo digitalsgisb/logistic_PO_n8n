@@ -1,0 +1,19 @@
+{
+  "PG": {
+    "GCI010|BZN90": "D24L",
+    "GCI011|BZL90": "D95B",
+    "GCI013|BZU60": "D55L FC",
+    "GCI012|BZ300": "D55L BAD",
+    "GCI014|BY330": "D74A",
+    "GCI005|BZ020": "C. STEP"
+  },
+  "PM": {
+    "GC501|BZU90": "D27A",
+    "GC601|BY880": "D66B",
+    "GC201|BZF50": "D38L",
+    "GC602|BZ060": "GC602"
+  },
+  "PK": {
+    "GCG01|BZ460": "D66B BAD"
+  }
+}

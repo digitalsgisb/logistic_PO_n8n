@@ -5,6 +5,8 @@ import './style.css';
 import companyMark from './assets/sugihara-mark.png';
 import { Workflow } from './Workflow';
 import { DateBoard } from './DateBoard';
+import { notifyFileTypeError } from './file-type-alert';
+import type { FileTypeNotice } from './file-type-alert';
 
 function BrandLockup() {
   return (
@@ -12,7 +14,6 @@ function BrandLockup() {
       <img className="company-mark" src={companyMark} alt="Sugihara Grand Industries" />
       <span className="brand-workspace">
         <strong>Logistic Digital</strong>
-        <span className="brand-sub">Logistic Workspace</span>
       </span>
     </span>
   );
@@ -30,13 +31,14 @@ function UnitMark() {
 }
 type Result = {
   id: string;
-  status: 'ready' | 'review';
+  status: 'ready' | 'review' | 'saved';
   order_id: string;
   kb_number?: string;
   destination?: string;
   date?: string;
   dates?: string[];
   order_count?: number;
+  trip_count?: number;
   order_numbers?: string[];
   filename?: string;
   error?: string;
@@ -44,6 +46,9 @@ type Result = {
 };
 type Job = {
   id: string;
+  file_type_error?: FileTypeNotice;
+  perodua_date?: string;
+  perodua_entry_id?: string;
   state: string;
   stage: string;
   progress: number;
@@ -51,7 +56,8 @@ type Job = {
   pages_total: number;
   error?: string;
   results: Result[];
-  files: { id: string; filename: string; size: number; duplicate?: boolean; error?: string }[];
+  files: { id: string; filename: string; size: number; duplicate?: boolean; error?: string;
+    company?: 'PERODUA' | 'TOYOTA'; perodua?: { status: string; pido: string } }[];
 };
 const finished = new Set(['completed', 'partial', 'failed', 'interrupted']);
 function Icon({ name, size = 22 }: { name: string; size?: number }) {
@@ -307,6 +313,9 @@ function AccountPanel({ session, close }: { session: Session; close: () => void 
 }
 
 function App() {
+  const [peroduaRevision, setPeroduaRevision] = useState(0);
+  const [peroduaTargetDate, setPeroduaTargetDate] = useState('');
+  const [peroduaTargetId, setPeroduaTargetId] = useState('');
   const [session, setSession] = useState<Session | null>(null),
     [checking, setChecking] = useState(true),
     [files, setFiles] = useState<File[]>([]),
@@ -319,13 +328,13 @@ function App() {
     [retryBusy, setRetryBusy] = useState(false),
     [accountOpen, setAccountOpen] = useState(false),
     [historyGeneration, setHistoryGeneration] = useState(0),
-    [section, setSection] = useState<'dispatch' | 'review' | 'dates'>(() =>
+    [section, setSection] = useState<'dispatch' | 'dates'>(() =>
       sessionStorage.getItem('toyota_section') === 'dates' ? 'dates' : 'dispatch');
-  const showSection = (next: 'dispatch' | 'review' | 'dates') => {
+  const showSection = (next: 'dispatch' | 'dates') => {
     sessionStorage.setItem('toyota_section', next);
     const moveToSection = (behavior: ScrollBehavior) => {
       if (next === 'dates') window.scrollTo({ top: 0, behavior });
-      else document.getElementById(next === 'review' ? 'workflow-review' : 'workflow-upload')
+      else document.getElementById('workflow-upload')
         ?.scrollIntoView({ block: 'start', behavior });
     };
     const changesPage = (section === 'dates') !== (next === 'dates');
@@ -387,7 +396,24 @@ function App() {
       clearInterval(timer);
     };
   }, [job?.id, job?.state, session]);
+  useEffect(() => {
+    if (job && finished.has(job.state))
+      notifyFileTypeError(job.file_type_error, window.sessionStorage, message => window.alert(message));
+  }, [job?.id, job?.state, job?.file_type_error?.id]);
   const busy = upload !== null || (!!job && !finished.has(job.state));
+  useEffect(() => {
+    const addToDate = (event: Event) => {
+      if (busy || retryBusy) { setError('Wait for document processing to finish.'); return; }
+      setJob(null); setFiles([]); setError('');
+      localStorage.removeItem('toyota_job');
+      setHistoryGeneration(value => value + 1);
+      setPeroduaTargetDate((event as CustomEvent<{ date: string }>).detail.date);
+      setPeroduaTargetId((event as CustomEvent<{ entry_id?: string }>).detail.entry_id ?? '');
+      showSection('dispatch');
+    };
+    window.addEventListener('add-perodua-pos', addToDate);
+    return () => window.removeEventListener('add-perodua-pos', addToDate);
+  }, [busy, retryBusy, section]);
   const add = (incoming: File[]) => {
     if (busy || job) return;
     setError('');
@@ -420,7 +446,7 @@ function App() {
     const form = new FormData();
     files.forEach((f) => form.append('files', f));
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/api/jobs');
+    xhr.open('POST', '/api/jobs' + (peroduaTargetId ? '?perodua_entry_id=' + encodeURIComponent(peroduaTargetId) : peroduaTargetDate ? '?perodua_date=' + encodeURIComponent(peroduaTargetDate) : ''));
     xhr.setRequestHeader('X-Requested-With', 'ToyotaPO');
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) setUpload(Math.round((e.loaded / e.total) * 100));
@@ -448,10 +474,16 @@ function App() {
     xhr.send(form);
   };
   const restart = () => {
+    setPeroduaTargetDate('');
+    setPeroduaTargetId('');
     setJob(null);
     setFiles([]);
     setError('');
     localStorage.removeItem('toyota_job');
+  };
+  const refreshSavedOrders = async () => {
+    if (job) setJob(await api('/api/jobs/' + job.id));
+    setPeroduaRevision(value => value + 1);
   };
   const login = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -567,11 +599,6 @@ function App() {
               <span>Daily dispatch</span>
               <span className="sidebar-chevron" aria-hidden="true">›</span>
             </button>
-            <button className={`sidebar-link${section === 'review' ? ' is-current' : ''}`} onClick={() => showSection('review')}>
-              <Icon name="file" />
-              <span>Review & print</span>
-              <span className="sidebar-chevron" aria-hidden="true">›</span>
-            </button>
             <button className={`sidebar-link${section === 'dates' ? ' is-current' : ''}`} onClick={() => showSection('dates')}>
               <Icon name="calendar" />
               <span>Orders by date</span>
@@ -588,19 +615,15 @@ function App() {
           </div>
         </nav>
         <div className="sidebar-bottom">
-          <div className="sidebar-card">
-            <strong>Logistic Workspace</strong>
-            <span>Shah Alam · Bukit Raja</span>
-            <div className="processing-label">
-              <span className="status-dot" />
-              Local AI processing
-            </div>
-          </div>
           <UnitMark />
         </div>
       </aside>
       <main>
         <div className="workspace-pane" hidden={section === 'dates'}>
+          {(peroduaTargetDate || job?.perodua_date) && <p className="tag-warning" role="status">
+            Adding Perodua POs to <strong>{(peroduaTargetDate || job!.perodua_date!).split('-').reverse().join('/')}</strong>.
+            {!job && <button type="button" className="outline" disabled={busy} onClick={() => { setPeroduaTargetDate(''); setPeroduaTargetId(''); }}>Cancel date selection</button>}
+          </p>}
           <Workflow
             key={historyGeneration}
             files={files}
@@ -623,6 +646,8 @@ function App() {
               }
             }}
             openDates={() => showSection('dates')}
+            reviewRefreshKey={job?.id + ':' + job?.state + ':' + peroduaRevision + ':' + historyGeneration}
+            onReviewUpdated={refreshSavedOrders}
           />
         </div>
         {section === 'dates' && <section className="date-page" id="orders-by-date">
@@ -630,13 +655,12 @@ function App() {
             <div>
               <div className="eyebrow teal">ORDER HISTORY</div>
               <h1>Saved orders</h1>
-              <p>Review each delivery date and release its Kanban Excel when the orders are complete.</p>
             </div>
-            <button type="button" className="outline" onClick={() => showSection('dispatch')}>
-              ← Daily dispatch
-            </button>
           </div>
-          <DateBoard refreshKey={job?.id + ':' + job?.state} canClearHistory={session.isAdmin} onHistoryCleared={() => {
+          <DateBoard refreshKey={job?.id + ':' + job?.state + ':' + peroduaRevision} canClearHistory={session.isAdmin}
+            onUpdated={refreshSavedOrders} onHistoryCleared={() => {
+            setPeroduaTargetDate('');
+            setPeroduaTargetId('');
             setJob(null);
             setFiles([]);
             setError('');

@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { Tagging } from './Tagging';
+import { DateBoard } from './DateBoard';
 type Result = {
   id: string;
   status: string;
   date?: string;
   order_count?: number;
+  trip_count?: number;
   order_numbers?: string[];
   order_id: string;
+  filename?: string;
   error?: string;
 };
 type Job = {
@@ -16,7 +19,7 @@ type Job = {
   progress: number;
   error?: string;
   results: Result[];
-  files: { filename: string }[];
+  files: { filename: string; company?: 'PERODUA' | 'TOYOTA'; perodua?: { status: string; pido: string } }[];
 };
 export function Workflow({
   files,
@@ -30,6 +33,8 @@ export function Workflow({
   retry,
   maxMb,
   openDates,
+  reviewRefreshKey,
+  onReviewUpdated,
 }: {
   files: File[];
   job: Job | null;
@@ -42,6 +47,8 @@ export function Workflow({
   retry: () => void;
   maxMb: number;
   openDates: () => void;
+  reviewRefreshKey: string;
+  onReviewUpdated: () => Promise<void> | void;
 }) {
   const [mode, setMode] = useState('both'),
     [tag, setTag] = useState<File>(),
@@ -87,7 +94,6 @@ export function Workflow({
         <div>
           <div className="eyebrow teal">DAILY LOGISTICS</div>
           <h1>Logistic Digital</h1>
-          <p>Upload documents, check your quantities, and print your rack tags.</p>
         </div>
         {active && (
           <button className="outline" disabled={busy} onClick={reset}>
@@ -96,24 +102,19 @@ export function Workflow({
         )}
       </div>
       <nav className="workflow-progress" aria-label="Dispatch progress">
-        {['Upload', 'Review', 'Print'].map((label, i) => (
+        {['Upload', 'Review'].map((label, i) => (
           <a
             key={label}
-            href={['#workflow-upload', '#workflow-review', '#tag-print-review'][i]}
+            href={['#workflow-upload', '#workflow-review'][i]}
             aria-current={step === i + 1 ? 'step' : undefined}
           >
             <b>{i + 1}</b>
             {label}
-            {i === 2 && mode === 'po' ? ' (not needed)' : ''}
           </a>
         ))}
-        <span>
-          {busy
-            ? (job?.stage ?? 'Uploading…')
-            : active
-              ? 'Your documents stay together'
-              : 'Start with your documents'}
-        </span>
+        {(busy || !active) && <span>
+          {busy ? (job?.stage ?? 'Uploading…') : 'Start with your documents'}
+        </span>}
       </nav>
       {(error || localError) && (
         <p className="error" role="alert">
@@ -265,6 +266,8 @@ export function Workflow({
               {r.order_id}: {r.error}
             </p>
           ))}
+        {job && done && mode !== 'tags' && <DateBoard jobId={job.id} refreshKey={reviewRefreshKey}
+          canClearHistory={false} disabled={busy} onUpdated={onReviewUpdated} />}
         <button type="button" className="outline orders-link" onClick={openDates}>
           Open Orders by date →
         </button>
@@ -272,12 +275,6 @@ export function Workflow({
           <button className="outline" onClick={retry}>
             Retry unsuccessful POs
           </button>
-        )}
-        {canReview && mode !== 'po' && !tag && (
-          <p className="tag-warning">
-            Open Documents above and add your tagging PDF to continue. Files selected in the browser need to
-            be selected again after a refresh.
-          </p>
         )}
       </section>
       {canReview && mode !== 'po' && tag && (
@@ -288,7 +285,7 @@ export function Workflow({
           sourceFile={tag}
           guided
           workbooks={[]}
-          onStage={setStep}
+          onStage={() => setStep(2)}
         />
       )}
     </>

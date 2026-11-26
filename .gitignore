@@ -12,3 +12,9 @@ outputs/
 /*.xls
 /*.xlsx
 templates/source.xls
+
+backups/
+test-data/
+__pycache__/
+*.pyc
+perodua-settings.json

@@ -11,7 +11,8 @@ import path from 'node:path';
 import { ZipArchive } from 'archiver';
 import { config } from './config.ts';
 import { Store } from './store.ts';
-import { Engine, publicJob } from './engine.ts';
+import { Engine, jobResults, publicJob } from './engine.ts';
+import { peroduaReview, savedPeroduaExport, resolvePeroduaDate } from './perodua-history.ts';
 import type { Job } from './types.ts';
 import { readPdf } from './pdf.ts';
 import { assemble } from './mapping.ts';
@@ -50,7 +51,7 @@ export async function buildApp(options = config) {
   if (store.getMeta('date-ledger-import-v1') !== 'done') {
     if (!store.allDates().length) {
       for (const job of store.all().filter((entry) => ['completed', 'partial'].includes(entry.state))) {
-        const orders = assemble(job.pages).orders;
+        const orders = assemble(job.pages.filter(page => !page.history_deleted)).orders;
         if (orders.length) {
           try {
             await engine.ledger.ingest(orders);
@@ -192,12 +193,79 @@ export async function buildApp(options = config) {
     store.deleteOtherSessions(user.username, token);
     return { ok: true };
   });
-  app.post('/api/jobs', async (req, reply) => {
+  const settingsFile = options.peroduaSettingsPath;
+  app.get('/api/perodua', () => peroduaReview(options.dataDir, settingsFile));
+  app.post('/api/perodua/generate', (req, reply) => {
+    const body = req.body as { job_id?: unknown; document_keys?: unknown; serials?: unknown; save_date?: unknown; save_id?: unknown } | undefined;
+    const saveId = typeof body?.save_id === 'string' ? body.save_id : undefined;
+    if (saveId && !/^[A-Za-z0-9_-]{1,120}$/.test(saveId)) return reply.code(400).send({ error: 'Invalid saved batch.' });
+    const saveDate = typeof body?.save_date === 'string' ? body.save_date : undefined;
+    if (saveDate && !/^\d{4}-\d{2}-\d{2}$/.test(saveDate)) return reply.code(400).send({ error: 'Invalid saved date.' });
+    const values = body?.serials ?? ['', '', ''];
+    if (!Array.isArray(values) || values.length !== 3 ||
+        values.some((value, index) => typeof value !== 'string' ||
+          (value.trim() !== '' && (!(index === 2 ? /^(?:PG)?[0-9]+$/i : /^[0-9]+$/).test(value.trim()) ||
+          Number(value.trim().replace(/^PG/i, '')) < 1))))
+      return reply.code(400).send({ error: 'SUGI No, GC No and Serial No. may be blank. Filled values must be positive numbers; Serial No. may start with PG.' });
+    const serials = values.map(value => String(value).trim().toUpperCase());
+    if (typeof body?.job_id === 'string') return engine.generateSavedPerodua({ jobId: body.job_id, serials, saveDate, saveId });
+    if (Array.isArray(body?.document_keys) && body.document_keys.length &&
+        body.document_keys.every(key => typeof key === 'string'))
+      return engine.generateSavedPerodua({ keys: body.document_keys, serials, saveDate, saveId });
+    return reply.code(400).send({ error: 'Choose the current Perodua batch or selected documents to export.' });
+  });
+  app.get('/api/perodua/status', async () => {
+    const latest = await savedPeroduaExport(options.dataDir);
+    const file = path.join(options.dataDir, 'perodua', 'Combined_Delivery.xlsx');
+    return { excel: !!latest || await fs.access(file).then(() => true, () => false) };
+  });
+  app.post<{ Params: { date: string } }>('/api/perodua/dates/:date/complete', req => engine.setPeroduaDate(req.params.date, true));
+  app.post<{ Params: { date: string } }>('/api/perodua/dates/:date/reopen', req => engine.setPeroduaDate(req.params.date, false));
+  app.delete<{ Params: { date: string } }>('/api/perodua/dates/:date', req => { admin(req as typeof req & AuthenticatedRequest); return engine.deleteSavedDate('PERODUA', req.params.date); });
+  app.get<{ Params: { date: string } }>('/api/perodua/dates/:date/workbook', async (req, reply) => {
+    const review = await peroduaReview(options.dataDir, settingsFile);
+    const date = resolvePeroduaDate(review.dates, req.params.date);
+    if (!date || date.status !== 'complete' || !date.export_id)
+      return reply.code(409).send({ error: 'Mark this Perodua date complete before downloading its Excel.' });
+    const output = await savedPeroduaExport(options.dataDir, date.export_id);
+    if (!output) return reply.code(404).send({ error: 'Saved workbook not found.' });
+    return reply.type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      .header('Content-Disposition', `attachment; filename="${output.filename}"`).send(await fs.readFile(output.path));
+  });
+  app.get<{ Params: { exportId: string } }>('/api/perodua/exports/:exportId', async (req, reply) => {
+    const entry = await savedPeroduaExport(options.dataDir, req.params.exportId);
+    if (!entry) return reply.code(404).send({ error: 'Saved Perodua export not found.' });
+    if (entry.save_date && !entry.completed_at) return reply.code(409).send({ error: 'Mark the saved date complete first.' });
+    return reply.type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      .header('Content-Disposition', `attachment; filename="${entry.filename}"`).send(await fs.readFile(entry.path));
+  });
+  app.get('/api/perodua/workbook', async (_req, reply) => {
+    const latest = await savedPeroduaExport(options.dataDir);
+    if (latest?.save_date && !latest.completed_at) return reply.code(409).send({ error: 'Mark the saved date complete first.' });
+    const file = path.join(options.dataDir, 'perodua', 'Combined_Delivery.xlsx');
+    try {
+      const bytes = await fs.readFile(latest?.path ?? file);
+      return reply.type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        .header('Content-Disposition', `attachment; filename="${latest?.filename ?? 'Combined_Delivery.xlsx'}"`).send(bytes);
+    } catch { return reply.code(404).send({ error: 'No Perodua Excel has been generated yet.' }); }
+  });
+  app.post<{ Querystring: { perodua_date?: string; perodua_entry_id?: string } }>('/api/jobs', async (req, reply) => {
+    const targetKey = req.query.perodua_entry_id ?? req.query.perodua_date;
+    let targetDate: string | undefined, targetId: string | undefined;
+    if (targetKey) {
+      const dates = (await peroduaReview(options.dataDir, settingsFile)).dates;
+      const selected = resolvePeroduaDate(dates, targetKey);
+      if (!selected || selected.status !== 'open')
+        return reply.code(409).send({ error: 'Reopen the Perodua date before adding POs to it.' });
+      targetDate = selected.date; targetId = selected.id;
+    }
+
     if (engine.clearing) return reply.code(503).send({ error: 'History is being cleared. Try again shortly.' });
     const id = randomUUID(),
       dir = path.join(options.dataDir, id);
     await fs.mkdir(dir, { recursive: true });
     const job: Job = {
+      perodua_date: targetDate, perodua_entry_id: targetId,
       id,
       state: 'queued',
       stage: 'Queued',
@@ -253,7 +321,7 @@ export async function buildApp(options = config) {
       if (!job.files.length) throw Object.assign(new Error('Select at least one PDF.'), { statusCode: 400 });
       store.save(job);
       reply.code(202);
-      return publicJob(job);
+      return publicJob(job, options.dataDir);
     } catch (e) {
       await fs.rm(dir, { recursive: true, force: true });
       throw e;
@@ -273,6 +341,7 @@ export async function buildApp(options = config) {
   app.post<{ Params: { date: string } }>('/api/dispatch-dates/:date/reopen', async (req) =>
     engine.ledger.publicEntry(await engine.ledger.setComplete(req.params.date, false)),
   );
+  app.delete<{ Params: { date: string } }>('/api/dispatch-dates/:date', req => { admin(req as typeof req & AuthenticatedRequest); return engine.deleteSavedDate('TOYOTA', req.params.date); });
   app.delete('/api/history', async (req) => {
     admin(req as typeof req & AuthenticatedRequest);
     return { ok: true, ...(await engine.clearHistory()) };
@@ -285,7 +354,23 @@ export async function buildApp(options = config) {
       .header('Cache-Control', 'no-store');
     return reply.send(output.buffer);
   });
-  app.get<{ Params: { id: string } }>('/api/jobs/:id', (req) => publicJob(getJob(req.params.id)));
+  app.get<{ Params: { id: string } }>('/api/jobs/:id/saved-dates', async (req) => {
+    const job = getJob(req.params.id);
+    const pageIds = new Set(job.pages.filter(page => !page.history_deleted).map(page => page.id));
+    const toyota = store.allDates().filter(entry => entry.job_id === job.id ||
+      entry.orders.some(order => order.source_page_ids.some(id => pageIds.has(id))))
+      .map(entry => ({ ...engine.ledger.publicEntry(entry), company: 'TOYOTA' as const }));
+    const files = job.files.filter(file => !file.history_deleted && file.perodua?.status === 'ready');
+    const review = await peroduaReview(options.dataDir, settingsFile);
+    const perodua = review.dates.filter(entry => files.some(file => {
+      const metadata = file.perodua!;
+      if (metadata.entry_id) return metadata.entry_id === entry.id;
+      if (metadata.export_id) return metadata.export_id === entry.export_id || entry.versions.some(version => version.id === metadata.export_id);
+      return entry.id === entry.date && (metadata.save_date ?? metadata.generated_date) === entry.date;
+    }));
+    return { dates: [...toyota, ...perodua] };
+  });
+  app.get<{ Params: { id: string } }>('/api/jobs/:id', (req) => publicJob(getJob(req.params.id), options.dataDir));
   app.post<{ Querystring: { job?: string } }>('/api/tagging/review', async (req, reply) => {
     const part = await req.file({ limits: { files: 1, fileSize: options.maxFileBytes } });
     if (!part || !/\.pdf$/i.test(part.filename))
@@ -295,7 +380,7 @@ export async function buildApp(options = config) {
       return reply.code(400).send({ error: 'Choose a valid PDF within the upload limit.' });
     try {
       const texts = await readPdf(bytes, 100);
-      const orders = req.query.job ? assemble(getJob(req.query.job).pages).orders : [];
+      const orders = req.query.job ? assemble(getJob(req.query.job).pages.filter(page => !page.history_deleted)).orders : [];
       return { pages: analyseTagging(texts, orders) };
     } catch (error) {
       return reply
@@ -304,12 +389,12 @@ export async function buildApp(options = config) {
     }
   });
   app.post<{ Params: { id: string } }>('/api/jobs/:id/retry', (req) =>
-    publicJob(engine.retry(req.params.id)),
+    publicJob(engine.retry(req.params.id), options.dataDir),
   );
   app.get<{ Params: { id: string; outputId: string } }>(
     '/api/jobs/:id/outputs/:outputId',
     async (req, reply) => {
-      const r = getJob(req.params.id).results.find(
+      const r = jobResults(getJob(req.params.id), options.dataDir).find(
         (r) => r.id === req.params.outputId && r.status === 'ready',
       );
       if (!r?.path) return reply.code(404).send({ error: 'Output not found.' });
@@ -321,7 +406,7 @@ export async function buildApp(options = config) {
   );
   app.get<{ Params: { id: string } }>('/api/jobs/:id/download-all', async (req, reply) => {
     const job = getJob(req.params.id),
-      results = job.results.filter((r) => r.status === 'ready');
+      results = jobResults(job, options.dataDir).filter((r) => r.status === 'ready');
     if (!results.length) return reply.code(404).send({ error: 'No completed templates yet.' });
     const zip = new ZipArchive({ zlib: { level: 6 } });
     reply

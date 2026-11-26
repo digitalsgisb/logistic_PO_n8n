@@ -5,13 +5,15 @@ export function ExcelDownload({
   date,
   orders,
   files,
+  label: customLabel,
 }: {
   href: string;
   date?: string;
   orders?: number;
   files?: number;
+  label?: string;
 }) {
-  const label = files ? 'Download all Excel files' : 'Download Kanban Excel';
+  const label = customLabel ?? (files ? 'Download all Excel files' : 'Download Kanban Excel');
   const detail = files
     ? `${files} workbooks · ZIP file`
     : [

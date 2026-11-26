@@ -26,6 +26,7 @@ export interface Order extends Omit<Extraction, 'destination'> {
 }
 export type PageState = 'pending' | 'extracting' | 'extracted' | 'error';
 export interface Page {
+  history_deleted?: boolean;
   id: string;
   file_id: string;
   filename: string;
@@ -36,7 +37,30 @@ export interface Page {
   extraction?: Extraction;
   error?: string;
 }
+export interface PeroduaOutput {
+  entry_id?: string;
+  dates?: import('./perodua-history.ts').PeroduaSavedDate[];
+  save_date?: string;
+  date_status?: 'open' | 'complete';
+  trip_count?: number;
+  missing_trip_count?: number;
+  date?: import('./perodua-history.ts').PeroduaSavedDate;
+  document_key?: string;
+  document_keys?: string[];
+  export_id?: string;
+  generated_date?: string;
+  created_at?: string;
+  status: 'ready' | 'review' | 'extracted';
+  pido: string;
+  json_path: string;
+  filename?: string;
+  path?: string;
+  document_count?: number;
+  item_count?: number;
+  error?: string;
+}
 export interface Upload {
+  history_deleted?: boolean;
   id: string;
   filename: string;
   hash: string;
@@ -44,10 +68,13 @@ export interface Upload {
   path: string;
   error?: string;
   duplicate?: boolean;
+  perodua?: PeroduaOutput;
+  company?: 'PERODUA' | 'TOYOTA';
 }
 export interface Result {
   id: string;
-  status: 'ready' | 'review';
+  status: 'ready' | 'review' | 'saved';
+  trip_count?: number;
   order_id: string;
   kb_number?: string;
   destination?: string;
@@ -62,6 +89,8 @@ export interface Result {
   source_page_ids?: string[];
 }
 export interface Job {
+  perodua_entry_id?: string;
+  perodua_date?: string;
   id: string;
   state:
     | 'queued'
@@ -82,6 +111,10 @@ export interface Job {
   error?: string;
 }
 export interface DispatchDate {
+  id?: string;
+  job_id?: string;
+  filename?: string;
+  exports?: { id: string; filename: string; created_at: string; order_count: number; trip_count: number }[];
   date: string;
   status: 'open' | 'complete';
   orders: Order[];

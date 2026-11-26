@@ -47,3 +47,17 @@ export async function readPdf(bytes: Uint8Array, maxPages = 100): Promise<string
     await task.destroy();
   }
 }
+
+export function detectCompany(
+  pages: string[]
+): 'PERODUA' | 'TOYOTA'{
+  const extractedText = pages.join('\n');
+
+  return /\bPerodua\b/i.test(extractedText)
+  ? 'PERODUA'
+  : 'TOYOTA';
+}
+
+
+
+///need to call python parser for if text contains =="PERODUA"

@@ -4,10 +4,12 @@ function positive(name: string, fallback: number) {
   if (!Number.isFinite(n) || n <= 0) throw new Error(`${name} must be positive`);
   return n;
 }
+const dataDir = path.resolve(process.env.DATA_DIR ?? 'data');
 export const config = {
   port: positive('PORT', 3000),
   host: process.env.HOST ?? '0.0.0.0',
-  dataDir: path.resolve(process.env.DATA_DIR ?? 'data'),
+  dataDir,
+  peroduaSettingsPath: path.resolve(process.env.PERODUA_SETTINGS_PATH ?? path.join(dataDir, 'perodua', 'settings.json')),
   template: path.resolve(process.env.TEMPLATE_PATH ?? 'templates/toyota.xlsx'),
   username: process.env.PILOT_USERNAME ?? 'pilot',
   password: process.env.PILOT_PASSWORD ?? '',

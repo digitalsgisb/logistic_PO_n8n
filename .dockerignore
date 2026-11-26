@@ -13,3 +13,8 @@ templates/source.xls
 !templates/toyota.xlsx
 tests
 README.md
+backups
+test-data
+__pycache__
+*.pyc
+perodua-settings.json

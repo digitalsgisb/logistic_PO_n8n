@@ -1,14 +1,14 @@
 # Logistic Digital
 
-An internal Toyota order converter: upload PDF purchase orders, extract them with local Ollama through n8n, and save one combined Kanban workbook for each printed PO delivery date, releasing it when the operator confirms that date is complete.
+An internal Toyota and Perodua PO converter. Toyota retains local Ollama extraction through n8n and its date-based Kanban workbook. Perodua uses Python extraction and SQLite-backed PG/PM/PK exports. Both companies appear in Daily dispatch Review and Orders by date.
 
 The interface uses a compact Sugihara Grand Industries logo, Digital Transformation Unit branding, and a dark-blue palette with a subtle animated gradient. The header and desktop sidebar stay fixed while content scrolls. Animation respects reduced-motion preferences. PO numbers go in Remarks beside their trip: `SGIS12AA0747-SA` for Shah Alam and `SGIS13FA5002-BR` for Bukit Raja. Original order IDs are retained separately for source validation. POs are grouped by their printed delivery date, even when one PDF contains several dates. Each date has a saved draft Excel. The operator marks a date complete only after all its POs have arrived; this unlocks the download. A later changed PO reopens the date for review and a revised Excel. Repeated POs are counted once. Tagging review and printing remain available after each upload.
 
 ## Rack tagging and Windows printing
 
-The workspace follows **Upload → Review → Print**. Choose **PO + tagging** for the complete task, select both PDFs, and click **Process documents**. The tagging PDF waits for PO processing before quantity checks. **PO only** and **Tagging only** remain available. Completed uploads collapse into a summary. **Orders by date** is a separate sidebar view for saved dates, completion, and Excel downloads; the dispatch screen has a link to it. Clean page previews start collapsed; warnings open automatically. Copy changes clear print confirmation. Use **New batch** to start over; after a refresh, select the tagging file again under Documents.
+The workspace follows **Upload → Review**, with tagging print controls available during review. Choose **PO + tagging** for the complete task, select both PDFs, and click **Process documents**. The tagging PDF waits for PO processing before quantity checks. **PO only** and **Tagging only** remain available. Completed uploads collapse into a summary. **Orders by date** is a separate sidebar view for saved dates, completion, and Excel downloads; the dispatch screen has a link to it. Clean page previews start collapsed; warnings open automatically. Copy changes clear print confirmation. Use **New batch** to start over; after a refresh, select the tagging file again under Documents.
 
-Choose **Daily dispatch** in the sidebar to upload documents, or **Review & print** to return to your results. Small-tag pages default to one copy each. Each small tag represents one rack (repeated part tags count separately). The large page is identified by its ORDER NUMBER and SKID NO fields and matched by destination, delivery sequence, supplier, dock and lane. Its copies equal two per rack, except Shah Alam `238X`, `HU82`, which need one per rack. Bukit Raja `614`/`614V` needs one copy per 60 PO pieces, rounded up; without a matching PO, its small-tag count is provisional and requires manual verification. HU83 (HOOK) always contributes exactly two large-page copies total, including when the PO lists three racks. The supplied six-rack example produces two original small-tag sheets plus twelve large-page copies: fourteen printed pages.
+Choose **Daily dispatch** in the sidebar to upload and review documents, or **Orders by date** for saved history. Small-tag pages default to one copy each. Each small tag represents one rack (repeated part tags count separately). The large page is identified by its ORDER NUMBER and SKID NO fields and matched by destination, delivery sequence, supplier, dock and lane. Its copies equal two per rack, except Shah Alam `238X`, `HU82`, which need one per rack. Bukit Raja `614`/`614V` needs one copy per 60 PO pieces, rounded up; without a matching PO, its small-tag count is provisional and requires manual verification. HU83 (HOOK) always contributes exactly two large-page copies total, including when the PO lists three racks. The supplied six-rack example produces two original small-tag sheets plus twelve large-page copies: fourteen printed pages.
 
 Convert the POs first to cross-check rack counts against validated orders in the current batch. When matched, the PO's ORDER (KANBANS) drives copies and the table compares PO racks with tags found. Standalone tagging uses the small-tag count and explicitly asks the user to verify it against the PO. Unknown pages, missing identifiers, duplicate rack covers, unknown parts, and count discrepancies display review notes. The user can select page types, edit copies, or set zero to exclude a page. They must confirm review before preparing the print packet; changing a count clears confirmation. Limits are 100 source pages, 500 copies per page and 1,000 output pages.
 
@@ -195,3 +195,12 @@ The initial bundled template was prepared from the source BIFF cells, styles, di
 - This pilot does not update monitoring workbooks, Microsoft 365, or other customers' records.
 
 See `docs/verification.md` for the implementation's recorded checks and deployment limitations.
+
+---
+
+## Toyota and Perodua integration
+
+Perodua processing and the shared review/history interface are now included.
+Perodua data uses new tables inside the existing `DATA_DIR/jobs.sqlite` database;
+Toyota retains its existing n8n/Ollama workflow and date-based Kanban export.
+See [Perodua SQLite setup, tables and verification](docs/perodua-sqlite.md).

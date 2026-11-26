@@ -12,6 +12,7 @@
     "build": "tsc --noEmit && vite build",
     "start": "tsx server/index.ts",
     "test": "tsx --test tests/*.test.ts",
+    "db:init": "tsx scripts/init-perodua-db.ts",
     "prepare:template": "tsx scripts/prepare-template.ts",
     "workflow": "tsx scripts/build-workflow.ts",
     "sample": "tsx scripts/sample.ts",

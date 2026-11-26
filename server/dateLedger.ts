@@ -3,6 +3,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { DispatchDate, Order } from './types.ts';
 import { Store } from './store.ts';
+import { removeHistoryFiles } from './history-files.ts';
 import { batchFilename, ordersByDate, writeBatch } from './workbook.ts';
 
 const identity = (order: Order) => `${order.source_order_id}|${order.destination}|${order.delivery_sequence}`;
@@ -98,6 +99,18 @@ export class DateLedger {
     });
   }
 
+  deleteDate(date: string) {
+    return this.serial(async () => {
+      const file = this.file(date);
+      const entry = this.store.getDate(date);
+      if (!entry) throw Object.assign(new Error('Saved Toyota date not found.'), { statusCode: 404 });
+      return removeHistoryFiles([file], () => {
+        this.store.deleteDate(date);
+        return { id: date, date, job_id: undefined as string | undefined,
+          source_page_ids: entry.orders.flatMap(order => order.source_page_ids) };
+      });
+    });
+  }
   clearAll(jobIds: string[]) {
     return this.serial(async () => {
       const dates = this.store.allDates();
@@ -121,6 +134,7 @@ export class DateLedger {
       date: entry.date,
       status: entry.status,
       order_count: entry.orders.length,
+      trip_count: new Set(entry.orders.map(order => order.trip)).size,
       order_numbers: entry.orders.map((order) => order.kb_number),
       trips: [...new Set(entry.orders.map((order) => order.trip))].sort((a, b) => a - b),
       sources: [...new Set(entry.orders.flatMap((order) => order.source_pages))],

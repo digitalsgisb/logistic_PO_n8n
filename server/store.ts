@@ -4,6 +4,7 @@ import path from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
 import type { Job, DispatchDate } from './types.ts';
 import { hashPassword, verifyPassword } from './auth.ts';
+import { peroduaSchema } from './perodua-storage.ts';
 
 export interface UserAccount {
   username: string;
@@ -20,6 +21,7 @@ export class Store {
     this.db = new DatabaseSync(path.join(dir, 'jobs.sqlite'));
     this.db.exec(`
       PRAGMA journal_mode=WAL;
+      PRAGMA busy_timeout=30000;
       PRAGMA foreign_keys=ON;
       CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, payload TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS dispatch_dates (date TEXT PRIMARY KEY, payload TEXT NOT NULL);
@@ -37,6 +39,7 @@ export class Store {
       );
       CREATE INDEX IF NOT EXISTS sessions_username ON sessions(username);
     `);
+    this.db.exec(peroduaSchema);
   }
 
   ensureBootstrapUser(username: string, password: string) {
@@ -151,6 +154,7 @@ export class Store {
     const row = this.db.prepare('SELECT payload FROM dispatch_dates WHERE date=?').get(date);
     return row ? JSON.parse(String(row.payload)) : undefined;
   }
+  deleteDate(date: string) { this.db.prepare('DELETE FROM dispatch_dates WHERE date=?').run(date); }
   allDates(): DispatchDate[] {
     return this.db.prepare('SELECT payload FROM dispatch_dates ORDER BY date DESC').all()
       .map((row) => JSON.parse(String(row.payload)));
@@ -158,7 +162,7 @@ export class Store {
   clearHistoryRows() {
     this.db.exec('BEGIN IMMEDIATE');
     try {
-      this.db.exec('DELETE FROM dispatch_dates; DELETE FROM jobs; COMMIT');
+      this.db.exec("DELETE FROM dispatch_dates; DELETE FROM jobs; DELETE FROM perodua_batch_documents; DELETE FROM perodua_exports; DELETE FROM perodua_batches; DELETE FROM perodua_documents; DELETE FROM perodua_meta; INSERT INTO perodua_meta VALUES ('initialized','true'); COMMIT");
     } catch (error) {
       this.db.exec('ROLLBACK');
       throw error;

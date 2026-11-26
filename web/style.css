@@ -2121,7 +2121,9 @@ h3 {
 .date-board-heading p { margin: 0 0 18px; max-width: 70ch; color: #5e7184; line-height: 1.5; }
 .date-board-toolbar { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin: 2px 0 25px; }
 .date-board-toolbar label { display: grid; gap: 6px; color: #53677b; font-size: 12px; font-weight: 650; }
-.date-board-toolbar select { min-width: 155px; border: 1px solid #cbd8e6; border-radius: 9px; background: #fff; color: #173a57; padding: 9px 12px; font: inherit; font-size: 13px; }
+.date-board-toolbar select, .date-board-toolbar input[type="date"] { box-sizing: border-box; min-width: 155px; min-height: 38px; border: 1px solid #cbd8e6; border-radius: 9px; background: #fff; color: #173a57; padding: 9px 12px; font: inherit; font-size: 13px; }
+.date-board-toolbar input[type="date"] { width: 175px; color-scheme: light; }
+.date-board-toolbar input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
 .clear-history { margin-left: auto; border: 1px solid #d9b2b2; border-radius: 9px; padding: 10px 13px; background: #fff; color: #9a3131; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 .clear-history:hover { background: #fff2f2; }
 .date-year-group { margin: 20px 0 30px; }
@@ -2143,3 +2145,23 @@ h3 {
 .date-card-actions .primary, .date-card-actions .outline { width: 100%; justify-content: center; }
 .date-card-actions .excel-download { width: 100%; }
 @media (max-width: 650px) { .date-board-heading { flex-direction: column; } .clear-history { margin-left: 0; } }
+
+.local-test-panel { margin-bottom: 24px; padding: 18px 22px; border: 1px solid #b9d5e6; border-left: 5px solid #176084; border-radius: 10px; background: #f1f8fc; }
+.local-test-panel p { margin: 10px 0; }
+.local-test-panel textarea { display: block; width: 100%; max-width: 780px; padding: 12px; margin: 12px 0; font: 13px Consolas, monospace; }
+@media print { .local-test-panel { display: none !important; } }
+
+.perodua-serial-inputs, .perodua-model-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin: 16px 0; }
+.perodua-serial-inputs label, .perodua-model-inputs label { display: flex; flex-direction: column; gap: 6px; font-weight: 600; }
+.perodua-serial-inputs input, .perodua-model-inputs input { width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid #a9becd; border-radius: 6px; background: white; }
+.perodua-history-document { border-top: 1px solid #dce4eb; padding: 14px 0; overflow-wrap: anywhere; }
+.perodua-history-document p { margin: 6px 0; }
+#perodua-settings { scroll-margin-top: 100px; }
+.perodua-dialog { width: min(760px, calc(100vw - 32px)); max-height: 86dvh; overflow-y: auto; margin: auto; padding: 26px; border: 1px solid #d3dfe8; border-radius: 16px; color: #173a57; background: white; box-shadow: 0 20px 70px #102b4966; }
+.perodua-dialog::backdrop { background: #102b498c; }
+.perodua-dialog-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; }
+.perodua-dialog-heading small { color: #176084; font-weight: 700; letter-spacing: .06em; }
+.perodua-dialog-heading h2 { margin: 8px 0; }
+.perodua-dialog-actions { display: flex; justify-content: flex-end; gap: 12px; margin: 20px 0; flex-wrap: wrap; }
+.perodua-dialog p { margin: 12px 0; line-height: 1.5; }
+@media print { .perodua-dialog { display: none !important; } }
