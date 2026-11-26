@@ -74,7 +74,12 @@ test('Perodua saves to the same SQLite database, merges PM/PK, and preserves exi
     assert.equal(pgBook.getWorksheet('Delivery')!.getCell('H2').value, 'D24L');
     const mixedBook = await complete(mixed.id);
     const sheet = mixedBook.getWorksheet('Delivery')!;
-    assert.equal(sheet.columnCount, 14);
+    assert.equal(sheet.columnCount, 13);
+    assert.equal(sheet.getCell('K1').value, 'Total Qty');
+    assert.equal(sheet.getCell('K2').value, 60);
+    assert.equal(sheet.getCell('K3').value, 60);
+    assert.equal(sheet.getCell('L1').value, 'Delivery Time');
+    assert.equal(sheet.getCell('M1').value, 'TRIP');
     assert.equal(sheet.getCell('G2').value, 'PM1');
     assert.equal(sheet.getCell('G3').value, '001');
     assert.equal(sheet.getCell('I2').value, 'D27A');

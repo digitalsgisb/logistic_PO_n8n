@@ -13,13 +13,13 @@ from perodua_ordering import ordered_items
 
 HEADERS = [
     "SUGI No", "GC No", "Current Date", "Serial No.", "Back No", "Destination",
-    "PIDO Number", "Delivery Date", "Model No", "Part Name", "Qty per Box",
-    "Total Box", "Delivery Time", "TRIP",
+    "PIDO Number", "Delivery Date", "Model No", "Part Name", "Total Qty",
+    "Delivery Time", "TRIP",
 ]
-WIDTHS = [13, 13, 16, 17, 15, 19, 21, 16, 20, 48, 16, 14, 17, 12]
+WIDTHS = [13, 13, 16, 17, 15, 19, 21, 16, 20, 48, 16, 17, 12]
 PG_HEADERS = ["SO.NO", "DO GC ERP", "DO SG ERP", "SERIAL NO", "PDIO NO", "DATE", "MODEL", "DESCRIPTION", "QTY", "TRIP"]
 PG_WIDTHS = [14, 17, 17, 17, 21, 16, 16, 24, 15, 12]
-LAYOUT_VERSION = 11
+LAYOUT_VERSION = 12
 
 
 def malaysia_today():
@@ -81,7 +81,7 @@ def build_rows(data, models, last_used, increment_mode="Once per PDF", today=Non
             int(advance_serial(last_used[1], row_offset)) if last_used[1] else None,
             current_date, advance_serial(last_used[2], serial_offset) or None, back_no,
             destination, pido, delivery_date, get_model_no(back_no, item.get("part_no"), pido), item["part_name"],
-            item["qty_per_box"], item["total_box"], delivery_time, data.get("delivery_trip"),
+            item["qty_per_box"] * item["total_box"], delivery_time, data.get("delivery_trip"),
         ])
     row_steps = len(rows) if increment_mode in {"Every item row", "SUGI/GC per row"} else 1
     serial_steps = len(rows) if increment_mode == "Every item row" else 1
@@ -174,15 +174,15 @@ def _write_sheet(wb, title, rows, pg=False):
             row[8].number_format = '#,##0'
             row[9].number_format = '0'
         else:
-            for index in (0, 1, 10, 11):
+            for index in (0, 1, 10):
                 row[index].number_format = '0' if index in (0, 1) else '#,##0'
             for index in (2, 7):
                 row[index].number_format = 'dd/mm/yyyy'
             row[3].number_format = '@'
             row[6].number_format = '@'
             row[9].alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
-            row[12].number_format = 'hh:mm'
-            row[13].number_format = '0'
+            row[11].number_format = 'hh:mm'
+            row[12].number_format = '0'
     edge = Side(style='thin', color='000000')
     grid = Border(left=edge, right=edge, top=edge, bottom=edge)
     for row in sheet.iter_rows():

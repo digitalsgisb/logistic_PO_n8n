@@ -61,7 +61,7 @@ Perodua-only batches do not invoke n8n. Retries reuse parsed Perodua JSON and do
 not create another export for already saved entries.
 
 Perodua batches save automatically with blank number fields. PG uses its 10-column
-format. PM and numeric-only PK use the same 14-column format and may share a batch
+format. PM and numeric-only PK use the same 13-column format and may share a batch
 and Delivery worksheet. Mixed cards display PERODUA PM & PK; mixed Excel names use
 `DD-MM-YYYY_PERODUA_PM_PK_PO.xlsx`. PG stays separate. Reopen a completed entry
 before adding POs. Same-date batches have separate IDs/files; repeated filenames
@@ -71,7 +71,9 @@ Existing sort/model/destination rules remain: PM uses Back No groups and model
 mapping, with destination 1045(SDY); PK uses trip ordering and
 1047(PK). PK Back No GC G01 with middle part code BZ460 maps to D66B BAD; other
 PK combinations return no model. Both sort delivery dates from earliest to latest. PG keeps trip/item order.
-Model conditions live in `server/perodua-models.json`.
+Model conditions live in `server/perodua-models.json`. PM/PK use a single Total Qty
+column calculated as Qty per Box × Total Box; the two factors remain in extracted
+data but are not separate Excel columns. Delivery Time and TRIP are the final columns.
 
 Perodua PDF/extraction sidecars remain under `DATA_DIR/<job>/perodua/<file>/` and
 Excel versions under `DATA_DIR/perodua/exports/`. These are file artifacts; their

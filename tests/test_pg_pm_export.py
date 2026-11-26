@@ -31,7 +31,7 @@ class PgPmExportTest(unittest.TestCase):
                  ('PG', 'GCI013', 'BZU60', 'D55L FC'), ('PG', 'GCI012', 'BZ300', 'D55L BAD'),
                  ('PG', 'GCI014', 'BY330', 'D74A'), ('PG', 'GCI005', 'BZ020', 'C. STEP'),
                  ('PM', 'GC 501', 'BZU90', 'D27A'), ('PM', 'GC601', 'BY880', 'D66B'),
-                 ('PM', 'GC201', 'BZF50', 'D38L'), ('PM', 'GC602', 'BZ060', 'GC602')]
+                 ('PM', 'GC201', 'BZF50', 'D38L'), ('PM', 'GC602', 'BZ060', 'D66B CASW')]
         for prefix, back, middle, expected in rules:
             with self.subTest(prefix=prefix, back=back):
                 self.assertEqual(get_model_no(back.lower(), f'64770-{middle.lower()}-C0', prefix.lower() + '123'), expected)
@@ -136,9 +136,9 @@ class PgPmExportTest(unittest.TestCase):
         self.assertEqual([row['data']['PIDO'] for row in ordered], ['PM2', 'PM11', 'PM10', 'PM13', 'PM12'])
         pm, pg, serials, _ = build_export_rows(entries, ['100', '200', 'PG300'], date(2026, 11, 25))
         self.assertEqual(pg, [])
-        self.assertEqual([row[13] for row in pm], [3, 2, 1, 3, 1])
+        self.assertEqual([row[12] for row in pm], [3, 2, 1, 3, 1])
         self.assertEqual([row[6] for row in pm], ['PM2', 'PM11', 'PM10', 'PM13', 'PM12'])
-        self.assertEqual([row[8] for row in pm], ['D27A', 'D27A', 'GC602', 'GC602', 'D38L'])
+        self.assertEqual([row[8] for row in pm], ['D27A', 'D27A', 'D66B CASW', 'D66B CASW', 'D38L'])
         self.assertEqual([row[0] for row in pm], [100, 101, 102, 103, 104])
         self.assertEqual([row[3] for row in pm], ['PG300', 'PG301', 'PG302', 'PG303', 'PG304'])
         self.assertEqual(serials, ['104', '204', 'PG304'])
@@ -154,9 +154,9 @@ class PgPmExportTest(unittest.TestCase):
             self.assertEqual(book['PM']['G2'].value, 'PM1')
             self.assertEqual(book['PM']['A2'].value, 100)
             self.assertEqual(book['PM']['I2'].value, 'D27A')
-            self.assertEqual(book['PM'].max_column, 14)
-            self.assertEqual(book['PM']['N1'].value, 'TRIP')
-            self.assertEqual(book['PM']['N2'].value, 1)
+            self.assertEqual(book['PM'].max_column, 13)
+            self.assertEqual(book['PM']['M1'].value, 'TRIP')
+            self.assertEqual(book['PM']['M2'].value, 1)
         finally:
             book.close()
 
