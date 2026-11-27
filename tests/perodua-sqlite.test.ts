@@ -212,3 +212,32 @@ test('same-date Perodua batches stay separate, PM accepts PK, and incompatible t
     assert.equal((await app.inject({ method: 'DELETE', url: '/api/history', headers })).statusCode, 403);
   } finally { globalThis.fetch = oldFetch; await app.close(); await fs.rm(dir, { recursive: true, force: true }); }
 });
+
+test('uploaded PDF delivery timestamps determine the cutoff cards and filenames independently of upload time', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'production-perodua-cutoff-'));
+  const options = optionsFor(dir);
+  const { app, engine, store } = await buildApp(options);
+  const oldFetch = globalThis.fetch;
+  globalThis.fetch = async () => { throw new Error('Perodua must not call n8n.'); };
+  try {
+    const login = await app.inject({ method: 'POST', url: '/api/login', headers: origin,
+      payload: { username: 'pilot', password: options.password } });
+    const headers = { ...origin, cookie: String(login.headers['set-cookie']).split(';')[0] };
+    const pdf = (pido: string, stamp: string) => sample(pido).replace('25/11/2026 08:50 AM', stamp);
+    const form = multipart([pdf('PG1', '23/11/2026 08:00 AM'), pdf('PG2', '24/11/2026 07:59 AM'),
+      pdf('PM1', '23/11/2026 12:00 PM'), pdf('001', '24/11/2026 07:59 AM'), pdf('PG3', '24/11/2026 08:00 AM')]);
+    const uploaded = await app.inject({ method: 'POST', url: '/api/jobs', headers: { ...headers, 'content-type': form.type }, payload: form.payload });
+    assert.equal(uploaded.statusCode, 202, uploaded.body);
+    const id = uploaded.json().id;
+    const job = store.get(id)!; job.created_at = '2035-01-01T00:00:00Z'; store.save(job);
+    await engine.start(job);
+    assert.equal(store.get(id)!.state, 'completed', JSON.stringify(store.get(id)));
+    const cards = (await app.inject({ url: `/api/jobs/${id}/saved-dates`, headers })).json().dates;
+    assert.deepEqual(cards.map((entry: { date: string; family: string; order_count: number }) =>
+      `${entry.date}|${entry.family}|${entry.order_count}`).sort(),
+      ['2026-11-23|PG|2', '2026-11-23|PM_PK|2', '2026-11-24|PG|1']);
+    assert.equal(cards.every((entry: { date: string; filename: string }) => entry.filename.startsWith(entry.date.split('-').reverse().join('-'))), true);
+    assert.equal(store.db.prepare("SELECT delivery_date,delivery_time FROM perodua_documents WHERE pido='PG2'").get()!.delivery_date, '2026-11-24');
+    assert.equal(store.db.prepare("SELECT delivery_date,delivery_time FROM perodua_documents WHERE pido='PG2'").get()!.delivery_time, '07:59');
+  } finally { globalThis.fetch = oldFetch; await app.close(); await fs.rm(dir, { recursive: true, force: true }); }
+});

@@ -2124,6 +2124,15 @@ h3 {
 .date-board-toolbar select, .date-board-toolbar input[type="date"] { box-sizing: border-box; min-width: 155px; min-height: 38px; border: 1px solid #cbd8e6; border-radius: 9px; background: #fff; color: #173a57; padding: 9px 12px; font: inherit; font-size: 13px; }
 .date-board-toolbar input[type="date"] { width: 175px; color-scheme: light; }
 .date-board-toolbar input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
+.company-filter-field { border: 0; padding: 0; margin: 0; min-width: 0; }
+.company-filter-field legend { padding: 0; margin-bottom: 6px; color: #53677b; font-size: 12px; font-weight: 650; }
+.company-filter-buttons { display: flex; align-items: center; gap: 8px; }
+.company-filter-button { display: flex; align-items: center; justify-content: center; width: 94px; height: 58px; padding: 4px 8px; border: 1px solid #cbd8e6; border-radius: 9px; background: #fff; transition: border-color 150ms, box-shadow 150ms; }
+.company-filter-button img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.company-filter-button:hover { border-color: #617f98; box-shadow: 0 2px 7px #173a5718; }
+.company-filter-button[aria-pressed="true"] { border: 2px solid #173a57; box-shadow: 0 0 0 2px #173a5718; }
+.company-filter-button.perodua[aria-pressed="true"] { border-color: #078442; box-shadow: 0 0 0 2px #07844220; }
+.company-filter-button.reset { width: 48px; padding: 10px; }
 .clear-history { margin-left: auto; border: 1px solid #d9b2b2; border-radius: 9px; padding: 10px 13px; background: #fff; color: #9a3131; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 .clear-history:hover { background: #fff2f2; }
 .date-year-group { margin: 20px 0 30px; }

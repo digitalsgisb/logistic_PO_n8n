@@ -24,9 +24,10 @@ test('full history retains its filters and controls separately from dispatch rev
   const fields = ['Company', 'Choose date', '>Year', 'Sort dates'];
   for (let i = 1; i < fields.length; i++) assert.ok(html.indexOf(fields[i - 1]) < html.indexOf(fields[i]));
   assert.match(html, /type="date"/);
-  assert.match(html, /All companies/);
-  assert.match(html, /value="TOYOTA"/);
-  assert.match(html, /value="PERODUA"/);
+  assert.match(html, /aria-label="Filter Toyota"/);
+  assert.match(html, /aria-label="Filter Perodua"/);
+  assert.match(html, /aria-label="Clear filters"/);
+  assert.equal((html.match(/<select/g) ?? []).length, 2);
   for (const option of ['Oldest first', 'Newest first', 'Waiting first']) assert.ok(html.includes(option));
   assert.doesNotMatch(html, /dispatch-date-board-title/);
 });

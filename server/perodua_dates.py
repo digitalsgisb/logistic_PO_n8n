@@ -6,6 +6,7 @@ from perodua_ordering import order_documents, trip_summary
 from perodua_rules import pido_family, saved_family
 from excel_export import LAYOUT_VERSION
 from perodua_storage import database_path
+from perodua_business_date import delivery_business_date
 
 
 def ensure_dates(ledger):
@@ -88,12 +89,15 @@ def operate_date(ledger, state_dir, settings_path, keys, serials, save_date, act
             families = {pido_family(by_key[key]['data']['PIDO']) for key in keys}
             entry = {'id': identity, 'date': save_date, 'family': family or saved_family(families),
                      'status': 'open', 'document_keys': [], 'serials': serials or ['', '', ''], 'revision': 0,
+                     'date_basis': 'delivery_cutoff_08',
                      'updated_at': now.isoformat(), 'dirty': True}
             entries.append(entry)
         incoming = {pido_family(by_key[key]['data']['PIDO']) for key in keys}
         allowed = {'PM', 'PK'} if entry['family'] in ('PM', 'PK', 'PM_PK') else {entry['family']}
         if entry['family'] != 'MIXED' and not incoming <= allowed:
             raise ValueError('Add only ' + entry['family'] + ' POs to this entry. Use New batch for another prefix.')
+        if entry.get('date_basis') == 'delivery_cutoff_08' and any(delivery_business_date(by_key[key]['data']) != entry['date'] for key in keys):
+            raise ValueError('These POs belong to another date under the 08:00 delivery cutoff. Choose that date or start a new batch.')
         new_keys = list(dict.fromkeys(entry['document_keys'] + keys))
         combined = {pido_family(by_key[key]['data']['PIDO']) for key in new_keys}
         if combined == {'PM', 'PK'}:

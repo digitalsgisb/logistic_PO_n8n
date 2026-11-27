@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { PeroduaHistory } from './PeroduaHistory';
+import { CompanyFilters } from './CompanyFilters';
 import type { PeroduaDocument } from './perodua-types';
 import { SavedDateCard, dateLabel } from './SavedDateCard';
 import type { SavedDate } from './SavedDateCard';
@@ -83,9 +84,7 @@ export function DateBoard({ refreshKey, canClearHistory, onHistoryCleared, onUpd
       <button type="button" className="outline" disabled={loading} onClick={() => void load().catch(cause => setError(cause.message))}>{jobId ? 'Refresh batch' : 'Refresh dates'}</button>
     </div>
     {!jobId && <div className="date-board-toolbar">
-      <label>Company<select value={company} onChange={event => setCompany(event.target.value as CompanyFilter)}>
-        <option value="all">All companies</option><option value="TOYOTA">TOYOTA</option><option value="PERODUA">PERODUA</option>
-      </select></label>
+      <CompanyFilters company={company} onCompany={setCompany} onClear={resetFilters} />
       <label>Choose date<input type="date" value={chosenDate} onChange={event => {
         const value = event.target.value; setChosenDate(value);
         if (value) setYear(value.slice(0, 4));
@@ -98,7 +97,6 @@ export function DateBoard({ refreshKey, canClearHistory, onHistoryCleared, onUpd
       <label>Sort dates<select value={sort} onChange={event => setSort(event.target.value as SortOrder)}>
         <option value="oldest">Oldest first</option><option value="newest">Newest first</option><option value="waiting">Waiting first</option>
       </select></label>
-      {hasFilters && <button type="button" className="outline" onClick={resetFilters}>Clear filters</button>}
       {canClearHistory && <button type="button" className="clear-history" disabled={!!working} onClick={() => void clearHistory()}>{working === 'clear' ? 'Clearing…' : 'Clear history'}</button>}
     </div>}
     {error && <p className="error" role="alert">{error}</p>}

@@ -25,7 +25,7 @@ database from a development checkout.
 | Table | Contents |
 | --- | --- |
 | `perodua_documents` | Stable document key, PIDO, delivery date/time/trip, source filename and extracted JSON including all items |
-| `perodua_batches` | Unique batch ID, generation/save date, PG/PM/PK/PM_PK family, completion state and metadata |
+| `perodua_batches` | Unique batch ID, cutoff-adjusted PDF delivery date, PG/PM/PK/PM_PK family, completion state and metadata |
 | `perodua_batch_documents` | Ordered batch membership; one document can be selected in multiple independent batches |
 | `perodua_exports` | Immutable Excel filenames, batch association, dates and export metadata |
 | `perodua_meta` | Initialization marker and compatibility metadata for serials/models |
@@ -108,3 +108,34 @@ Run `npm test` and `npm run build`. Tests include the original Toyota account,
 mapping, date recovery and tagging checks, plus mixed-company authenticated n8n
 callbacks, shared SQLite persistence, transactional rollback, PM/PK combining,
 same-date batches, version retention and deletion authorization.
+
+
+## Perodua 08:00 delivery cutoff
+
+For new PG, PM and PK entries, the history/card date and filename date come from
+PDF delivery date/time, interpreted as Malaysia local time. Before 08:00, use the
+previous calendar day. At exactly 08:00 and later, use the printed delivery date.
+For example, 24/11 at 07:59 groups under 23/11; 24/11 at 08:00 groups under 24/11.
+Upload time, server timezone and the current date do not determine this grouping.
+
+Each upload splits by cutoff date and then by compatible family: PG stays separate,
+while PM/PK can share a date entry. PDFs dated 23/11 after 08:00 and 24/11 before
+08:00 can therefore be in one 23/11 entry. Excel keeps the original PDF delivery
+date/time. The Current Date column and generated_date metadata remain the actual
+Excel creation date; the filename uses the cutoff date.
+
+Adding POs to a new cutoff-based entry requires matching cutoff dates. Reopening,
+completing and regenerating an entry retains its assigned date. Existing saved
+entries are not automatically renamed or moved; legacy entries without the
+cutoff policy retain their earlier dating behavior. Start a new batch to apply the
+new grouping to old PDFs. No SQLite schema migration is required; date_basis is
+stored in the existing batch JSON payload.
+
+## Company logo filters
+
+Orders by date uses the provided Perodua logo, Toyota logo and prohibition icon
+instead of a Company dropdown. The logos filter the displayed company. The third
+icon clears company, exact-date and year filters and shows all matching entries;
+it does not delete history. It replaces the additional Clear filters text button.
+The calendar, Year and Sort dates controls remain. Logo selection is exposed with
+aria-pressed, and all three buttons have accessible names and keyboard focus.

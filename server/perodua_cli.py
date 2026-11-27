@@ -12,6 +12,7 @@ from perodua_ordering import order_documents, trip_summary
 from perodua_dates import operate_date, ensure_dates
 from export_filenames import save_unique_workbook
 from perodua_rules import pido_family, saved_family
+from perodua_business_date import delivery_business_date
 from perodua_storage import load_ledger, save_ledger, configure_database, database_path
 
 MALAYSIA = timezone(timedelta(hours=8))
@@ -79,18 +80,24 @@ def generate_saved(state_dir, settings_path, document_keys=None, document_jsons=
             raise ValueError('Perodua PIDO must start with PG/PM or contain only digits for PK.')
         batch = batch_id or uuid4().hex
         saved = []
-        groups = [('PG', {'PG'})] if 'PG' in families else []
-        compatible = set(families) & {'PM', 'PK'}
-        if compatible:
-            groups.append((saved_family(compatible), compatible))
-        for family, members in groups:
-            family_keys = [entry['key'] for entry in selected if pido_family(entry['data']['PIDO']) in members]
-            identity = batch + '_' + (save_date or now.date().isoformat()) + '_' + family
-            value = operate_date(ledger, state_dir, settings_path, family_keys, serials, save_date, 'save',
-                                 now, export_saved, save_ledger, new_id=identity, family=family)
-            if value['status'] != 'ready':
-                return value
-            saved.append(value)
+        days = sorted({delivery_business_date(entry['data']) for entry in selected})
+        if save_date and any(day != save_date for day in days):
+            raise ValueError('The selected date does not match the PDF delivery date/time under the 08:00 cutoff.')
+        for day in days:
+            daily = [entry for entry in selected if delivery_business_date(entry['data']) == day]
+            daily_families = {pido_family(entry['data']['PIDO']) for entry in daily}
+            groups = [('PG', {'PG'})] if 'PG' in daily_families else []
+            compatible = daily_families & {'PM', 'PK'}
+            if compatible:
+                groups.append((saved_family(compatible), compatible))
+            for family, members in groups:
+                family_keys = [entry['key'] for entry in daily if pido_family(entry['data']['PIDO']) in members]
+                identity = batch + '_' + day + '_' + family
+                value = operate_date(ledger, state_dir, settings_path, family_keys, serials, day, 'save',
+                                     now, export_saved, save_ledger, new_id=identity, family=family)
+                if value['status'] != 'ready':
+                    return value
+                saved.append(value)
         return {**saved[0], 'dates': [value['date'] for value in saved], 'outputs': saved}
     result = {'status': 'review', 'pido': 'Combined', 'json_path': str(database_path(state_dir).resolve())}
     return export_saved(ledger, state_dir, settings_path, list(dict.fromkeys(keys)), result, now, serials)
